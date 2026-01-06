@@ -50,6 +50,13 @@ export function StockDetailPage() {
       return;
     }
 
+    // Only show tooltip in candlestick area (top 80%), hide in volume area (bottom 20%)
+    const chartHeight = 500;
+    if (param.point.y > chartHeight * 0.8) {
+      setHoverData(null);
+      return;
+    }
+
     const timeStr = String(param.time).replace(/-/g, '');
     const entry = barsMap.current.get(timeStr);
     if (!entry) {
