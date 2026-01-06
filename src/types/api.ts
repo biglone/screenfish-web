@@ -75,3 +75,29 @@ export interface ExportEbkResponse {
 export interface HealthResponse {
   status: string;
 }
+
+export interface StockItem {
+  ts_code: string;
+  name: string | null;
+}
+
+export interface StockListResponse {
+  total: number;
+  stocks: StockItem[];
+}
+
+export interface DailyBar {
+  trade_date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  vol: number;
+  amount: number;
+}
+
+export interface StockDailyResponse {
+  ts_code: string;
+  name: string | null;
+  bars: DailyBar[];
+}

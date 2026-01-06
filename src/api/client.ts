@@ -10,6 +10,8 @@ import type {
   AvailabilityResponse,
   ExportEbkResponse,
   HealthResponse,
+  StockListResponse,
+  StockDailyResponse,
 } from '../types/api';
 
 // Get API base URL from environment or use default
@@ -76,6 +78,26 @@ class StockScreenerApi {
 
   async exportEbk(request: ScreenRequest): Promise<ExportEbkResponse> {
     const { data } = await this.client.post<ExportEbkResponse>('/v1/export/ebk', request);
+    return data;
+  }
+
+  async listStocks(params?: {
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<StockListResponse> {
+    const { data } = await this.client.get<StockListResponse>('/v1/stocks', { params });
+    return data;
+  }
+
+  async getStockDaily(
+    tsCode: string,
+    params?: { start?: string; end?: string; limit?: number }
+  ): Promise<StockDailyResponse> {
+    const { data } = await this.client.get<StockDailyResponse>(
+      `/v1/stocks/${encodeURIComponent(tsCode)}/daily`,
+      { params }
+    );
     return data;
   }
 }
