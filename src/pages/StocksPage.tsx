@@ -79,10 +79,10 @@ export function StocksPage() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                  代码
+                  名称
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                  名称
+                  代码
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
                   操作
@@ -92,13 +92,13 @@ export function StocksPage() {
             <tbody className="divide-y divide-gray-200 bg-white">
               {data.stocks.map((stock) => (
                 <tr key={stock.ts_code} className="hover:bg-gray-50">
+                  <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
+                    {stock.name || '-'}
+                  </td>
                   <td className="whitespace-nowrap px-6 py-4">
-                    <span className="font-mono text-sm text-gray-900">
+                    <span className="font-mono text-sm text-gray-500">
                       {stock.ts_code}
                     </span>
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                    {stock.name || '-'}
                   </td>
                   <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
                     <Link
