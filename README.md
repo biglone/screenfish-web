@@ -37,3 +37,15 @@ npm run dev
 
 - 前端用 `npm run build` 生成 `dist/` 静态文件后部署
 - 后端建议通过同域反代 `/api` 或正确设置 `STOCK_SCREENER_CORS_ORIGINS`
+
+## 本机生产模式（screenfish.biglone.tech）
+
+当前机器的线上入口已配置为同域 `/api`：
+
+- `https://screenfish.biglone.tech/`：前端静态资源（`dist/`）
+- `https://screenfish.biglone.tech/api/*`：反代到后端，再映射到后端的 `/v1/*`
+
+实现方式（本机）：
+
+- Cloudflare Tunnel（named tunnel）把 `screenfish.biglone.tech` 指向 `http://127.0.0.1:5174`
+- Caddy 监听 `127.0.0.1:5174`，静态托管 `dist/`，并将 `/api/*` 反代到后端 `127.0.0.1:8001`
