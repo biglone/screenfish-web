@@ -23,6 +23,7 @@ import type {
   WatchlistItemsRemoveRequest,
   WatchlistItemsUpsertRequest,
   WatchlistStateResponse,
+  LogTailResponse,
 } from '../types/api';
 
 // Get API base URL from environment or use default
@@ -234,6 +235,20 @@ class StockScreenerApi {
       updated_at: number;
       removed: number;
     }>(`/v1/watchlist/groups/${encodeURIComponent(groupId)}/items/remove`, request);
+    return data;
+  }
+
+  async getBackendLogs(params: {
+    lines?: number;
+    adminToken?: string;
+  }): Promise<LogTailResponse> {
+    const { lines = 200, adminToken } = params;
+    const { data } = await this.client.get<LogTailResponse>('/v1/admin/logs/backend', {
+      params: { lines },
+      ...(adminToken
+        ? { headers: { 'X-Admin-Token': adminToken } }
+        : {}),
+    });
     return data;
   }
 }

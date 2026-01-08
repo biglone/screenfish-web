@@ -206,3 +206,10 @@ export interface WatchlistItemsUpsertRequest {
 export interface WatchlistItemsRemoveRequest {
   ts_codes: string[];
 }
+
+export interface LogTailResponse {
+  source: 'journald' | 'file' | 'none';
+  unit?: string | null;
+  path?: string | null;
+  lines: string[];
+}

@@ -31,6 +31,10 @@ const UpdatePage = lazy(async () => {
   const mod = await import('./pages/UpdatePage');
   return { default: mod.UpdatePage };
 });
+const LogsPage = lazy(async () => {
+  const mod = await import('./pages/LogsPage');
+  return { default: mod.LogsPage };
+});
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -53,6 +57,7 @@ function App() {
             <Route path="watchlist" element={<WatchlistPage />} />
             <Route path="formulas" element={<FormulasPage />} />
             <Route path="screen" element={<ScreenPage />} />
+            <Route path="logs" element={<LogsPage />} />
             <Route path="update" element={<UpdatePage />} />
           </Route>
         </Routes>
