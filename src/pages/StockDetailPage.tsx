@@ -2,9 +2,23 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, X } from 'lucide-react';
-import { createChart, type IChartApi, type CandlestickData, type Time, CandlestickSeries, HistogramSeries } from 'lightweight-charts';
+import {
+  createChart,
+  type IChartApi,
+  type CandlestickData,
+  type ISeriesApi,
+  type LineData,
+  type Time,
+  type WhitespaceData,
+  CandlestickSeries,
+  HistogramSeries,
+  LineSeries,
+} from 'lightweight-charts';
 import api from '../api/client';
 import type { DailyBar } from '../types/api';
+
+const CHART_HEIGHT = 500;
+const SUB_PANE_HEIGHT = 0.2;
 
 interface HoverData {
   bar: DailyBar;
@@ -26,12 +40,75 @@ function toIsoDate(yyyymmdd: string): Time {
   return `${yyyymmdd.slice(0, 4)}-${yyyymmdd.slice(4, 6)}-${yyyymmdd.slice(6, 8)}` as Time;
 }
 
+function sma(values: Array<number | null>, n: number, m: number): Array<number | null> {
+  const out: Array<number | null> = new Array(values.length).fill(null);
+  let prev: number | null = null;
+  for (let i = 0; i < values.length; i += 1) {
+    const x = values[i];
+    if (x === null || Number.isNaN(x)) {
+      out[i] = null;
+      continue;
+    }
+    if (prev === null || Number.isNaN(prev)) {
+      prev = x;
+      out[i] = prev;
+      continue;
+    }
+    prev = (m * x + (n - m) * prev) / n;
+    out[i] = prev;
+  }
+  return out;
+}
+
+function calcKdj(bars: DailyBar[], n = 9, m1 = 3, m2 = 3) {
+  const llv: Array<number | null> = new Array(bars.length).fill(null);
+  const hhv: Array<number | null> = new Array(bars.length).fill(null);
+
+  for (let i = 0; i < bars.length; i += 1) {
+    if (i < n - 1) continue;
+    let minLow = Number.POSITIVE_INFINITY;
+    let maxHigh = Number.NEGATIVE_INFINITY;
+    for (let j = i - n + 1; j <= i; j += 1) {
+      minLow = Math.min(minLow, bars[j].low);
+      maxHigh = Math.max(maxHigh, bars[j].high);
+    }
+    llv[i] = minLow;
+    hhv[i] = maxHigh;
+  }
+
+  const rsv: Array<number | null> = bars.map((bar, i) => {
+    const lowN = llv[i];
+    const highN = hhv[i];
+    if (lowN === null || highN === null) return null;
+    const denom = highN - lowN;
+    if (denom === 0) return 0;
+    return ((bar.close - lowN) / denom) * 100;
+  });
+
+  const k = sma(rsv, m1, 1);
+  const d = sma(k, m2, 1);
+  const j = k.map((kv, i) => {
+    const dv = d[i];
+    if (kv === null || dv === null) return null;
+    return 3 * kv - 2 * dv;
+  });
+
+  return { k, d, j };
+}
+
 export function StockDetailPage() {
   const { tsCode } = useParams<{ tsCode: string }>();
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
+  const indicatorLineSeriesRefs = useRef<Array<ISeriesApi<'Line'>>>([]);
+  const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
+  const kdjLineSeriesRefs = useRef<Array<ISeriesApi<'Line'>>>([]);
+  const mainAreaRatioRef = useRef<number>(1 - SUB_PANE_HEIGHT);
   const [hoverData, setHoverData] = useState<HoverData | null>(null);
   const [modalData, setModalData] = useState<ModalData | null>(null);
+  const [selectedIndicatorId, setSelectedIndicatorId] = useState<number | null>(null);
+  const [showVolume, setShowVolume] = useState(true);
+  const [showKdj, setShowKdj] = useState(false);
   const lastClickTime = useRef<number>(0);
   const lastClickDate = useRef<string | null>(null);
 
@@ -41,8 +118,20 @@ export function StockDetailPage() {
     enabled: !!tsCode,
   });
 
+  const { data: indicatorFormulasData, isLoading: indicatorsLoading } = useQuery({
+    queryKey: ['formulas', 'indicator', 'enabled'],
+    queryFn: () => api.listFormulas({ enabledOnly: true, kind: 'indicator' }),
+  });
+
+  const { data: indicatorSeriesData, isLoading: indicatorSeriesLoading, error: indicatorSeriesError } = useQuery({
+    queryKey: ['indicator-series', tsCode, selectedIndicatorId],
+    queryFn: () => api.getIndicatorSeries(tsCode!, selectedIndicatorId!, { limit: 250 }),
+    enabled: !!tsCode && selectedIndicatorId !== null,
+  });
+
   // Build a map for quick lookup
   const barsMap = useRef<Map<string, { bar: DailyBar; index: number }>>(new Map());
+  const barsArrayRef = useRef<DailyBar[]>([]);
 
   const handleCrosshairMove = useCallback((param: { time?: Time; point?: { x: number; y: number } }) => {
     if (!param.time || !param.point || !chartContainerRef.current) {
@@ -50,9 +139,8 @@ export function StockDetailPage() {
       return;
     }
 
-    // Only show tooltip in candlestick area (top 80%), hide in volume area (bottom 20%)
-    const chartHeight = 500;
-    if (param.point.y > chartHeight * 0.8) {
+    const chartHeight = CHART_HEIGHT;
+    if (param.point.y > chartHeight * mainAreaRatioRef.current) {
       setHoverData(null);
       return;
     }
@@ -65,7 +153,7 @@ export function StockDetailPage() {
     }
 
     const { bar, index } = entry;
-    const prevBar = index > 0 ? Array.from(barsMap.current.values())[index - 1]?.bar : null;
+    const prevBar = index > 0 ? barsArrayRef.current[index - 1] ?? null : null;
 
     // Get container bounds for tooltip positioning
     const rect = chartContainerRef.current.getBoundingClientRect();
@@ -90,8 +178,7 @@ export function StockDetailPage() {
       const entry = barsMap.current.get(timeStr);
       if (entry) {
         const { bar, index } = entry;
-        const barsArray = Array.from(barsMap.current.values());
-        const prevBar = index > 0 ? barsArray[index - 1]?.bar : null;
+        const prevBar = index > 0 ? barsArrayRef.current[index - 1] ?? null : null;
         setModalData({ bar, prevBar });
       }
       lastClickDate.current = null;
@@ -106,6 +193,7 @@ export function StockDetailPage() {
 
     // Build bars map
     barsMap.current.clear();
+    barsArrayRef.current = data.bars;
     data.bars.forEach((bar, index) => {
       barsMap.current.set(bar.trade_date, { bar, index });
     });
@@ -119,7 +207,7 @@ export function StockDetailPage() {
     // Create chart
     const chart = createChart(chartContainerRef.current, {
       width: chartContainerRef.current.clientWidth,
-      height: 500,
+      height: CHART_HEIGHT,
       layout: {
         background: { color: '#ffffff' },
         textColor: '#333',
@@ -142,6 +230,9 @@ export function StockDetailPage() {
     });
 
     chartRef.current = chart;
+    indicatorLineSeriesRefs.current = [];
+    volumeSeriesRef.current = null;
+    kdjLineSeriesRefs.current = [];
 
     // Add candlestick series
     const candlestickSeries = chart.addSeries(CandlestickSeries, {
@@ -163,30 +254,6 @@ export function StockDetailPage() {
     }));
 
     candlestickSeries.setData(chartData);
-
-    // Add volume series
-    const volumeSeries = chart.addSeries(HistogramSeries, {
-      color: '#6b7280',
-      priceFormat: {
-        type: 'volume',
-      },
-      priceScaleId: 'volume',
-    });
-
-    chart.priceScale('volume').applyOptions({
-      scaleMargins: {
-        top: 0.8,
-        bottom: 0,
-      },
-    });
-
-    const volumeData = data.bars.map((bar) => ({
-      time: toIsoDate(bar.trade_date),
-      value: bar.vol,
-      color: bar.close >= bar.open ? '#ef4444' : '#22c55e',
-    }));
-
-    volumeSeries.setData(volumeData);
 
     // Subscribe to crosshair move for hover tooltip
     chart.subscribeCrosshairMove(handleCrosshairMove);
@@ -216,8 +283,158 @@ export function StockDetailPage() {
         chartRef.current.remove();
         chartRef.current = null;
       }
+      indicatorLineSeriesRefs.current = [];
+      volumeSeriesRef.current = null;
+      kdjLineSeriesRefs.current = [];
     };
   }, [data, handleCrosshairMove, handleChartClick]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || !data?.bars.length) return;
+
+    const subPaneCount = (showVolume ? 1 : 0) + (showKdj ? 1 : 0);
+    const mainAreaRatio = 1 - subPaneCount * SUB_PANE_HEIGHT;
+    mainAreaRatioRef.current = mainAreaRatio;
+
+    chart.applyOptions({
+      rightPriceScale: {
+        scaleMargins: {
+          top: 0,
+          bottom: subPaneCount * SUB_PANE_HEIGHT,
+        },
+      },
+    });
+
+    if (showVolume && !volumeSeriesRef.current) {
+      volumeSeriesRef.current = chart.addSeries(HistogramSeries, {
+        color: '#6b7280',
+        priceFormat: {
+          type: 'volume',
+        },
+        priceScaleId: 'volume',
+      });
+    }
+
+    if (volumeSeriesRef.current) {
+      if (!showVolume) {
+        chart.priceScale('volume').applyOptions({ visible: false });
+        chart.removeSeries(volumeSeriesRef.current);
+        volumeSeriesRef.current = null;
+      } else {
+        chart.priceScale('volume').applyOptions({
+          visible: true,
+          scaleMargins: {
+            top: mainAreaRatio,
+            bottom: showKdj ? SUB_PANE_HEIGHT : 0,
+          },
+        });
+        const volumeData = data.bars.map((bar) => ({
+          time: toIsoDate(bar.trade_date),
+          value: bar.vol,
+          color: bar.close >= bar.open ? '#ef4444' : '#22c55e',
+        }));
+        volumeSeriesRef.current.setData(volumeData);
+      }
+    }
+
+    if (showKdj && kdjLineSeriesRefs.current.length === 0) {
+      const colors = ['#f59e0b', '#3b82f6', '#ef4444'];
+      for (const color of colors) {
+        kdjLineSeriesRefs.current.push(
+          chart.addSeries(LineSeries, {
+            color,
+            lineWidth: 1,
+            priceLineVisible: false,
+            priceScaleId: 'kdj',
+          })
+        );
+      }
+      chart.priceScale('kdj').applyOptions({
+        visible: true,
+        scaleMargins: {
+          top: 1 - SUB_PANE_HEIGHT,
+          bottom: 0,
+        },
+      });
+    }
+
+    if (kdjLineSeriesRefs.current.length > 0) {
+      if (!showKdj) {
+        for (const s of kdjLineSeriesRefs.current) {
+          chart.removeSeries(s);
+        }
+        kdjLineSeriesRefs.current = [];
+      } else {
+        chart.priceScale('kdj').applyOptions({
+          visible: true,
+          scaleMargins: {
+            top: 1 - SUB_PANE_HEIGHT,
+            bottom: 0,
+          },
+        });
+        const { k, d, j } = calcKdj(data.bars);
+        const linePoints = [k, d, j].map((arr) =>
+          arr.map((v, i) =>
+            v === null
+              ? { time: toIsoDate(data.bars[i].trade_date) }
+              : { time: toIsoDate(data.bars[i].trade_date), value: v }
+          )
+        );
+
+        for (const [i, s] of kdjLineSeriesRefs.current.entries()) {
+          s.setData(linePoints[i] as Array<LineData<Time> | WhitespaceData<Time>>);
+        }
+      }
+    }
+  }, [data, showKdj, showVolume]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+
+    const clearIndicatorLines = () => {
+      for (const s of indicatorLineSeriesRefs.current) {
+        chart.removeSeries(s);
+      }
+      indicatorLineSeriesRefs.current = [];
+    };
+
+    if (
+      selectedIndicatorId === null ||
+      !indicatorSeriesData ||
+      indicatorSeriesData.formula_id !== selectedIndicatorId
+    ) {
+      clearIndicatorLines();
+      return;
+    }
+
+    clearIndicatorLines();
+
+    const lines =
+      indicatorSeriesData.lines && indicatorSeriesData.lines.length > 0
+        ? indicatorSeriesData.lines
+        : [{ name: indicatorSeriesData.name, points: indicatorSeriesData.points }];
+
+    const colors = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#3b82f6', '#a855f7', '#14b8a6'];
+
+    for (const [index, line] of lines.entries()) {
+      const s = chart.addSeries(LineSeries, {
+        color: colors[index % colors.length],
+        lineWidth: index === 0 ? 2 : 1,
+        priceLineVisible: false,
+      });
+
+      const lineData: Array<LineData<Time> | WhitespaceData<Time>> = line.points.map((p) =>
+        p.value === null
+          ? { time: toIsoDate(p.trade_date) }
+          : { time: toIsoDate(p.trade_date), value: p.value }
+      );
+
+      s.setData(lineData);
+      indicatorLineSeriesRefs.current.push(s);
+    }
+  }, [data, indicatorSeriesData, selectedIndicatorId]);
 
   if (!tsCode) {
     return <div className="p-4 text-red-500">Invalid stock code</div>;
@@ -273,7 +490,61 @@ export function StockDetailPage() {
       {/* Chart */}
       {data && (
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white p-4">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">K线图</h2>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">K线图</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-gray-500">指标</span>
+              <select
+                value={selectedIndicatorId ?? ''}
+                onChange={(e) =>
+                  setSelectedIndicatorId(e.target.value ? Number(e.target.value) : null)
+                }
+                disabled={!indicatorFormulasData?.formulas.length && !indicatorsLoading}
+                className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+              >
+                <option value="">无</option>
+                {(indicatorFormulasData?.formulas ?? []).map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                    {f.timeframe ? ` (${f.timeframe})` : ''}
+                  </option>
+                ))}
+              </select>
+              {indicatorSeriesLoading && (
+                <span className="text-sm text-gray-400">加载中...</span>
+              )}
+              {indicatorSeriesError && selectedIndicatorId !== null && (
+                <span className="text-sm text-red-600">
+                  {indicatorSeriesError instanceof Error ? indicatorSeriesError.message : '指标加载失败'}
+                </span>
+              )}
+              {!indicatorsLoading && (indicatorFormulasData?.formulas.length ?? 0) === 0 && (
+                <Link to="/formulas" className="text-sm text-gray-500 hover:text-gray-700">
+                  去创建指标公式
+                </Link>
+              )}
+
+              <span className="ml-2 text-sm text-gray-500">附图</span>
+              <label className="inline-flex items-center gap-1 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={showVolume}
+                  onChange={(e) => setShowVolume(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                成交量
+              </label>
+              <label className="inline-flex items-center gap-1 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={showKdj}
+                  onChange={(e) => setShowKdj(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                KDJ
+              </label>
+            </div>
+          </div>
           <div ref={chartContainerRef} className="relative w-full">
             {/* Hover Tooltip */}
             {hoverData && (

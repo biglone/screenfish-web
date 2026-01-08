@@ -12,6 +12,13 @@ import type {
   HealthResponse,
   StockListResponse,
   StockDailyResponse,
+  FormulaItem,
+  FormulaListResponse,
+  FormulaCreate,
+  FormulaUpdate,
+  FormulaValidateRequest,
+  FormulaValidateResponse,
+  IndicatorSeriesResponse,
 } from '../types/api';
 
 // Get API base URL from environment or use default
@@ -35,6 +42,17 @@ class StockScreenerApi {
         ...(apiKey && { 'X-API-Key': apiKey }),
       },
     });
+
+    this.client.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        const detail = error?.response?.data?.detail;
+        if (typeof detail === 'string' && detail.trim()) {
+          error.message = detail;
+        }
+        return Promise.reject(error);
+      }
+    );
   }
 
   setApiKey(apiKey: string) {
@@ -100,7 +118,69 @@ class StockScreenerApi {
     );
     return data;
   }
+
+  // Formula CRUD APIs
+  async listFormulas(enabledOnly?: boolean): Promise<FormulaListResponse>;
+  async listFormulas(arg?: {
+    enabledOnly?: boolean;
+    kind?: 'screen' | 'indicator';
+  }): Promise<FormulaListResponse>;
+  async listFormulas(
+    arg: boolean | { enabledOnly?: boolean; kind?: 'screen' | 'indicator' } = false
+  ): Promise<FormulaListResponse> {
+    const enabledOnly = typeof arg === 'boolean' ? arg : (arg.enabledOnly ?? false);
+    const kind = typeof arg === 'boolean' ? undefined : arg.kind;
+    const { data } = await this.client.get<FormulaListResponse>('/v1/formulas', {
+      params: {
+        enabled_only: enabledOnly,
+        ...(kind ? { kind } : {}),
+      },
+    });
+    return data;
+  }
+
+  async createFormula(request: FormulaCreate): Promise<FormulaItem> {
+    const { data } = await this.client.post<FormulaItem>('/v1/formulas', request);
+    return data;
+  }
+
+  async getFormula(id: number): Promise<FormulaItem> {
+    const { data } = await this.client.get<FormulaItem>(`/v1/formulas/${id}`);
+    return data;
+  }
+
+  async updateFormula(id: number, request: FormulaUpdate): Promise<FormulaItem> {
+    const { data } = await this.client.put<FormulaItem>(`/v1/formulas/${id}`, request);
+    return data;
+  }
+
+  async deleteFormula(id: number): Promise<{ ok: boolean; deleted: number }> {
+    const { data } = await this.client.delete<{ ok: boolean; deleted: number }>(
+      `/v1/formulas/${id}`
+    );
+    return data;
+  }
+
+  async validateFormula(request: FormulaValidateRequest): Promise<FormulaValidateResponse> {
+    const { data } = await this.client.post<FormulaValidateResponse>(
+      '/v1/formulas/validate',
+      request
+    );
+    return data;
+  }
+
+  async getIndicatorSeries(
+    tsCode: string,
+    formulaId: number,
+    params?: { start?: string; end?: string; limit?: number }
+  ): Promise<IndicatorSeriesResponse> {
+    const { data } = await this.client.get<IndicatorSeriesResponse>(
+      `/v1/stocks/${encodeURIComponent(tsCode)}/indicators/${formulaId}`,
+      { params }
+    );
+    return data;
+  }
 }
 
-export const api = new StockScreenerApi();
+export const api = new StockScreenerApi(getApiBaseUrl(), import.meta.env.VITE_API_KEY);
 export default api;

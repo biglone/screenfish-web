@@ -1,9 +1,11 @@
+import { Suspense } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Search, RefreshCw, Fish, List } from 'lucide-react';
+import { LayoutDashboard, Search, RefreshCw, Fish, List, FileCode } from 'lucide-react';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: '仪表盘' },
   { to: '/stocks', icon: List, label: '股票列表' },
+  { to: '/formulas', icon: FileCode, label: '公式管理' },
   { to: '/screen', icon: Search, label: '股票筛选' },
   { to: '/update', icon: RefreshCw, label: '数据更新' },
 ];
@@ -51,7 +53,15 @@ export function Layout() {
 
       {/* Main Content */}
       <main className="ml-64 flex-1 p-8">
-        <Outlet />
+        <Suspense
+          fallback={
+            <div className="flex justify-center py-16">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+            </div>
+          }
+        >
+          <Outlet />
+        </Suspense>
       </main>
     </div>
   );

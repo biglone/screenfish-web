@@ -101,3 +101,67 @@ export interface StockDailyResponse {
   name: string | null;
   bars: DailyBar[];
 }
+
+// Formula types
+export interface FormulaItem {
+  id: number;
+  name: string;
+  formula: string;
+  description: string | null;
+  kind: 'screen' | 'indicator';
+  timeframe: 'D' | 'W' | 'M' | null;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FormulaListResponse {
+  total: number;
+  formulas: FormulaItem[];
+}
+
+export interface FormulaCreate {
+  name: string;
+  formula: string;
+  description?: string | null;
+  kind?: 'screen' | 'indicator';
+  timeframe?: 'D' | 'W' | 'M' | null;
+  enabled?: boolean;
+}
+
+export interface FormulaUpdate {
+  name?: string;
+  formula?: string;
+  description?: string | null;
+  kind?: 'screen' | 'indicator';
+  timeframe?: 'D' | 'W' | 'M' | null;
+  enabled?: boolean;
+}
+
+export interface FormulaValidateRequest {
+  formula: string;
+}
+
+export interface FormulaValidateResponse {
+  valid: boolean;
+  message: string;
+}
+
+export interface IndicatorPoint {
+  trade_date: string;
+  value: number | null;
+}
+
+export interface IndicatorLine {
+  name: string;
+  points: IndicatorPoint[];
+}
+
+export interface IndicatorSeriesResponse {
+  ts_code: string;
+  formula_id: number;
+  name: string;
+  timeframe: 'D' | 'W' | 'M';
+  points: IndicatorPoint[];
+  lines?: IndicatorLine[];
+}

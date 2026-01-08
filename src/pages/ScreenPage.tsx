@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useScreenMutation, useExportEbk } from '../hooks/useApi';
+import api from '../api/client';
 import type { ScreenRequest, ScreenHit } from '../types/api';
 import {
   Search,
@@ -8,7 +10,10 @@ import {
   Filter,
   ChevronDown,
   ChevronUp,
+  CheckSquare,
+  Square,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export function ScreenPage() {
   const [formData, setFormData] = useState<ScreenRequest>({
@@ -19,29 +24,69 @@ export function ScreenPage() {
     with_name: true,
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [selectedFormulas, setSelectedFormulas] = useState<Set<string>>(new Set());
+
+  // Fetch formulas
+  const { data: formulasData, isLoading: formulasLoading } = useQuery({
+    queryKey: ['formulas', 'screen', 'enabled'],
+    queryFn: () => api.listFormulas({ enabledOnly: true, kind: 'screen' }),
+  });
 
   const screenMutation = useScreenMutation();
   const exportMutation = useExportEbk();
 
+  const enabledFormulas = formulasData?.formulas ?? [];
+
+  const handleToggleFormula = (name: string) => {
+    setSelectedFormulas((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) {
+        next.delete(name);
+      } else {
+        next.add(name);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedFormulas.size === enabledFormulas.length) {
+      setSelectedFormulas(new Set());
+    } else {
+      setSelectedFormulas(new Set(enabledFormulas.map((f) => f.name)));
+    }
+  };
+
   const handleScreen = () => {
-    screenMutation.mutate(formData);
+    // Build rules string from selected formulas
+    const rules =
+      selectedFormulas.size > 0
+        ? Array.from(selectedFormulas).join(',')
+        : null;
+    screenMutation.mutate({ ...formData, rules });
   };
 
   const handleExport = () => {
-    exportMutation.mutate(formData, {
-      onSuccess: (data) => {
-        // Download as file
-        const blob = new Blob([data.ebk], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `screen_${data.trade_date}.ebk`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      },
-    });
+    const rules =
+      selectedFormulas.size > 0
+        ? Array.from(selectedFormulas).join(',')
+        : null;
+    exportMutation.mutate(
+      { ...formData, rules },
+      {
+        onSuccess: (data) => {
+          const blob = new Blob([data.ebk], { type: 'text/plain;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `screen_${data.trade_date}.ebk`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        },
+      }
+    );
   };
 
   return (
@@ -50,8 +95,92 @@ export function ScreenPage() {
         <h1 className="text-2xl font-bold text-gray-900">股票筛选</h1>
       </div>
 
-      {/* Filter Form */}
+      {/* Formula Selection */}
       <div className="rounded-lg bg-white p-6 shadow">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900">选择筛选公式</h2>
+          <div className="flex items-center gap-4">
+            {enabledFormulas.length > 0 && (
+              <button
+                onClick={handleSelectAll}
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                {selectedFormulas.size === enabledFormulas.length
+                  ? '取消全选'
+                  : '全选'}
+              </button>
+            )}
+            <Link
+              to="/formulas"
+              className="text-sm text-gray-500 hover:text-gray-700"
+            >
+              管理公式
+            </Link>
+          </div>
+        </div>
+
+        {formulasLoading ? (
+          <div className="flex justify-center py-4">
+            <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+          </div>
+        ) : enabledFormulas.length === 0 ? (
+          <div className="rounded-lg bg-yellow-50 p-4 text-sm text-yellow-800">
+            暂无启用的公式。请先到{' '}
+            <Link to="/formulas" className="font-medium text-yellow-900 underline">
+              公式管理
+            </Link>{' '}
+            创建并启用公式。
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {enabledFormulas.map((formula) => (
+              <label
+                key={formula.id}
+                className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
+                  selectedFormulas.has(formula.name)
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => handleToggleFormula(formula.name)}
+                  className="mt-0.5 flex-shrink-0"
+                >
+                  {selectedFormulas.has(formula.name) ? (
+                    <CheckSquare className="h-5 w-5 text-blue-600" />
+                  ) : (
+                    <Square className="h-5 w-5 text-gray-400" />
+                  )}
+                </button>
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-gray-900">{formula.name}</div>
+                  {formula.description && (
+                    <div className="mt-1 truncate text-sm text-gray-500">
+                      {formula.description}
+                    </div>
+                  )}
+                  <div className="mt-1 truncate font-mono text-xs text-gray-400">
+                    {formula.formula.length > 50
+                      ? formula.formula.slice(0, 50) + '...'
+                      : formula.formula}
+                  </div>
+                </div>
+              </label>
+            ))}
+          </div>
+        )}
+
+        {selectedFormulas.size > 0 && (
+          <div className="mt-4 text-sm text-gray-500">
+            已选择 {selectedFormulas.size} 个公式
+          </div>
+        )}
+      </div>
+
+      {/* Filter Options */}
+      <div className="rounded-lg bg-white p-6 shadow">
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">筛选选项</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
             <label className="block text-sm font-medium text-gray-700">
@@ -82,38 +211,21 @@ export function ScreenPage() {
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              筛选规则
-            </label>
-            <input
-              type="text"
-              value={formData.rules ?? ''}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  rules: e.target.value || null,
-                })
-              }
-              placeholder="留空使用默认规则"
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
+          <div className="flex items-end">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+            >
+              {showAdvanced ? (
+                <ChevronUp className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
+              高级选项
+            </button>
           </div>
         </div>
-
-        {/* Advanced Options */}
-        <button
-          type="button"
-          onClick={() => setShowAdvanced(!showAdvanced)}
-          className="mt-4 flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
-        >
-          {showAdvanced ? (
-            <ChevronUp className="h-4 w-4" />
-          ) : (
-            <ChevronDown className="h-4 w-4" />
-          )}
-          高级选项
-        </button>
 
         {showAdvanced && (
           <div className="mt-4 grid grid-cols-1 gap-4 border-t pt-4 sm:grid-cols-2">
@@ -155,7 +267,7 @@ export function ScreenPage() {
         <div className="mt-6 flex gap-3">
           <button
             onClick={handleScreen}
-            disabled={screenMutation.isPending}
+            disabled={screenMutation.isPending || selectedFormulas.size === 0}
             className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:bg-blue-400"
           >
             {screenMutation.isPending ? (
@@ -181,6 +293,10 @@ export function ScreenPage() {
             </button>
           )}
         </div>
+
+        {selectedFormulas.size === 0 && enabledFormulas.length > 0 && (
+          <p className="mt-2 text-sm text-amber-600">请至少选择一个公式</p>
+        )}
       </div>
 
       {/* Error */}
@@ -195,13 +311,11 @@ export function ScreenPage() {
         <div className="rounded-lg bg-white shadow">
           <div className="border-b border-gray-200 px-6 py-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">
-                筛选结果
-              </h2>
+              <h2 className="text-lg font-semibold text-gray-900">筛选结果</h2>
               <div className="flex items-center gap-2 text-sm text-gray-500">
                 <Filter className="h-4 w-4" />
-                交易日: {formatDate(screenMutation.data.trade_date)} |{' '}
-                共 {screenMutation.data.hits.length} 只股票
+                交易日: {formatDate(screenMutation.data.trade_date)} | 共{' '}
+                {screenMutation.data.hits.length} 只股票
               </div>
             </div>
           </div>
@@ -227,7 +341,10 @@ export function ScreenPage() {
                       </th>
                     )}
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                      其他信息
+                      匹配规则
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                      操作
                     </th>
                   </tr>
                 </thead>
@@ -246,7 +363,15 @@ export function ScreenPage() {
                         </td>
                       )}
                       <td className="px-6 py-4 text-sm text-gray-500">
-                        {formatExtraFields(hit)}
+                        {String(hit.rules ?? '-')}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-sm">
+                        <Link
+                          to={`/stocks/${encodeURIComponent(hit.ts_code)}`}
+                          className="text-blue-600 hover:text-blue-800"
+                        >
+                          查看详情
+                        </Link>
                       </td>
                     </tr>
                   ))}
@@ -266,13 +391,4 @@ function formatDate(date: string | null | undefined): string {
     return `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;
   }
   return date;
-}
-
-function formatExtraFields(hit: ScreenHit): string {
-  const excludeKeys = ['ts_code', 'name'];
-  const extra = Object.entries(hit)
-    .filter(([key]) => !excludeKeys.includes(key))
-    .map(([key, value]) => `${key}: ${value}`)
-    .join(', ');
-  return extra || '-';
 }

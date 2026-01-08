@@ -1,73 +1,39 @@
-# React + TypeScript + Vite
+# ScreenFish Web
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+ScreenFish 的 Web UI（React + Vite），用于调用 `screenfish` 后端（FastAPI）的 `/v1` API。
 
-Currently, two official plugins are available:
+## 开发运行
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+1) 启动后端（默认 `http://127.0.0.1:8000`）：
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd ../screenfish
+stock_screener serve --cache ./data
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+2) 启动前端（默认 `http://localhost:5173`），并通过 Vite 代理 `/api -> http://localhost:8000`：
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd ../screenfish-web
+npm install
+npm run dev
 ```
+
+也可以用 `deploy.sh` 一键启动（后端 + 前端 + Cloudflare quick tunnel，偏开发用途）：
+
+```bash
+./deploy.sh
+```
+
+## 环境变量
+
+参考 `.env.example`：
+
+- `VITE_API_URL`：后端地址；开发默认用 `/api`（走 Vite proxy）
+- `VITE_PROXY_TARGET`：开发可选；Vite dev proxy 目标地址（默认 `http://localhost:8000`）
+- `VITE_API_KEY`：若后端设置了 `STOCK_SCREENER_API_KEY`，需设置该值以自动带上请求头 `X-API-Key`
+
+## 生产部署建议
+
+- 前端用 `npm run build` 生成 `dist/` 静态文件后部署
+- 后端建议通过同域反代 `/api` 或正确设置 `STOCK_SCREENER_CORS_ORIGINS`

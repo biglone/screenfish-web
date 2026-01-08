@@ -6,12 +6,13 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BACKEND_DIR="/home/Biglone/workspace/screenfish"
+BACKEND_DIR="${BACKEND_DIR:-$(cd "$SCRIPT_DIR/../screenfish" && pwd)}"
 FRONTEND_DIR="$SCRIPT_DIR"
 
-# 端口配置
-BACKEND_PORT=8001
-FRONTEND_PORT=5173
+# 端口配置（可通过环境变量覆盖）
+BACKEND_PORT="${BACKEND_PORT:-8000}"
+FRONTEND_PORT="${FRONTEND_PORT:-5173}"
+DEFAULT_PROXY_TARGET="http://localhost:$BACKEND_PORT"
 
 # 颜色输出
 RED='\033[0;31m'
@@ -58,8 +59,8 @@ fi
 log_info "[1/3] 启动后端服务 (端口 $BACKEND_PORT)..."
 cd "$BACKEND_DIR"
 
-# 设置 CORS 允许所有来源
-export STOCK_SCREENER_CORS_ORIGINS="*"
+# 设置 CORS（默认允许所有来源；建议在公网部署时设置为明确的域名列表）
+export STOCK_SCREENER_CORS_ORIGINS="${STOCK_SCREENER_CORS_ORIGINS:-*}"
 
 # 激活虚拟环境（如果存在）
 if [ -f ".venv/bin/activate" ]; then
@@ -86,6 +87,9 @@ log_info "后端服务已启动"
 # 2. 启动前端开发服务器（带代理）
 log_info "[2/3] 启动前端服务 (端口 $FRONTEND_PORT)..."
 cd "$FRONTEND_DIR"
+
+# 默认让 Vite proxy 指向本次启动的后端端口（可通过环境变量覆盖）
+export VITE_PROXY_TARGET="${VITE_PROXY_TARGET:-$DEFAULT_PROXY_TARGET}"
 
 # 使用 vite dev 模式运行（支持代理）
 nohup npm run dev -- --host 0.0.0.0 --port $FRONTEND_PORT \

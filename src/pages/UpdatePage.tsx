@@ -31,9 +31,10 @@ export function UpdatePage() {
   });
   const [checkDate, setCheckDate] = useState('');
 
+  const availabilityProvider = mode === 'normal' ? formData.provider : waitData.provider;
   const { data: availability, refetch: checkAvailability } = useAvailability(
     checkDate,
-    formData.provider,
+    availabilityProvider,
     !!checkDate && checkDate.length === 8
   );
 

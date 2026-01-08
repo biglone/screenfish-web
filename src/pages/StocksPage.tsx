@@ -1,17 +1,20 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import api from '../api/client';
 
 const PAGE_SIZE = 50;
 
+const preloadStockDetailPage = () => import('./StockDetailPage');
+
 export function StocksPage() {
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [page, setPage] = useState(0);
+  const queryClient = useQueryClient();
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, isFetching, error } = useQuery({
     queryKey: ['stocks', search, page],
     queryFn: () =>
       api.listStocks({
@@ -19,6 +22,8 @@ export function StocksPage() {
         limit: PAGE_SIZE,
         offset: page * PAGE_SIZE,
       }),
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
   });
 
   const handleSearch = (e: React.FormEvent) => {
@@ -46,15 +51,16 @@ export function StocksPage() {
             type="text"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="搜索股票代码或名称..."
+            placeholder="搜索股票代码/名称/拼音首字母..."
             className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </div>
         <button
           type="submit"
+          disabled={isFetching}
           className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
         >
-          搜索
+          {isFetching ? '搜索中...' : '搜索'}
         </button>
       </form>
 
@@ -104,6 +110,13 @@ export function StocksPage() {
                     <Link
                       to={`/stocks/${encodeURIComponent(stock.ts_code)}`}
                       className="text-blue-600 hover:text-blue-800"
+                      onMouseEnter={() => {
+                        void preloadStockDetailPage();
+                        void queryClient.prefetchQuery({
+                          queryKey: ['stock-daily', stock.ts_code],
+                          queryFn: () => api.getStockDaily(stock.ts_code, { limit: 250 }),
+                        });
+                      }}
                     >
                       查看详情
                     </Link>
