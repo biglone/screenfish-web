@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useScreenMutation, useExportEbk } from '../hooks/useApi';
 import api from '../api/client';
-import type { ScreenRequest, ScreenHit } from '../types/api';
+import type { ScreenRequest, ScreenHit, WatchlistItem } from '../types/api';
+import { StockDetail } from '../components/StockDetail';
+import { useWatchlist } from '../hooks/useWatchlist';
 import {
   Search,
   Download,
@@ -25,6 +27,13 @@ export function ScreenPage() {
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [selectedFormulas, setSelectedFormulas] = useState<Set<string>>(new Set());
+  const [selectedHits, setSelectedHits] = useState<Set<string>>(new Set());
+  const [activeTsCode, setActiveTsCode] = useState<string | null>(null);
+  const [targetGroupId, setTargetGroupId] = useState<string>('');
+  const [watchlistBusy, setWatchlistBusy] = useState(false);
+  const [watchlistError, setWatchlistError] = useState<string | null>(null);
+
+  const { groups, createGroup, addItems } = useWatchlist();
 
   // Fetch formulas
   const { data: formulasData, isLoading: formulasLoading } = useQuery({
@@ -36,6 +45,31 @@ export function ScreenPage() {
   const exportMutation = useExportEbk();
 
   const enabledFormulas = formulasData?.formulas ?? [];
+  const hits = screenMutation.data?.hits ?? [];
+
+  useEffect(() => {
+    if (!targetGroupId && groups.length > 0) setTargetGroupId(groups[0].id);
+  }, [groups, targetGroupId]);
+
+  useEffect(() => {
+    if (!screenMutation.data) return;
+    setSelectedHits(new Set());
+    setActiveTsCode(screenMutation.data.hits[0]?.ts_code ?? null);
+  }, [screenMutation.data]);
+
+  const selectedHitItems = useMemo(() => {
+    if (!screenMutation.data) return [];
+    if (selectedHits.size === 0) return [];
+    const out: WatchlistItem[] = [];
+    for (const hit of screenMutation.data.hits) {
+      if (!selectedHits.has(hit.ts_code)) continue;
+      out.push({
+        ts_code: hit.ts_code,
+        name: typeof hit.name === 'string' ? hit.name : null,
+      });
+    }
+    return out;
+  }, [screenMutation.data, selectedHits]);
 
   const handleToggleFormula = (name: string) => {
     setSelectedFormulas((prev) => {
@@ -87,6 +121,64 @@ export function ScreenPage() {
         },
       }
     );
+  };
+
+  const handleToggleHit = (tsCode: string) => {
+    setSelectedHits((prev) => {
+      const next = new Set(prev);
+      if (next.has(tsCode)) next.delete(tsCode);
+      else next.add(tsCode);
+      return next;
+    });
+  };
+
+  const handleSelectAllHits = () => {
+    if (!screenMutation.data) return;
+    if (selectedHits.size === screenMutation.data.hits.length) {
+      setSelectedHits(new Set());
+    } else {
+      setSelectedHits(new Set(screenMutation.data.hits.map((h) => h.ts_code)));
+    }
+  };
+
+  const handleAddSelectedToGroup = () => {
+    if (!targetGroupId) return;
+    void (async () => {
+      try {
+        setWatchlistError(null);
+        setWatchlistBusy(true);
+        await addItems(targetGroupId, selectedHitItems);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setWatchlistError(msg);
+      } finally {
+        setWatchlistBusy(false);
+      }
+    })();
+  };
+
+  const handleCreateGroupFromSelected = () => {
+    if (!screenMutation.data) return;
+    if (selectedHitItems.length === 0) return;
+
+    const suggested = `筛选-${formatDate(screenMutation.data.trade_date)}`;
+    const name = window.prompt('新建分组名称', suggested);
+    if (!name) return;
+    void (async () => {
+      try {
+        setWatchlistError(null);
+        setWatchlistBusy(true);
+        const id = await createGroup(name);
+        if (!id) return;
+        setTargetGroupId(id);
+        await addItems(id, selectedHitItems);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setWatchlistError(msg);
+      } finally {
+        setWatchlistBusy(false);
+      }
+    })();
   };
 
   return (
@@ -277,21 +369,6 @@ export function ScreenPage() {
             )}
             开始筛选
           </button>
-
-          {screenMutation.data && screenMutation.data.hits.length > 0 && (
-            <button
-              onClick={handleExport}
-              disabled={exportMutation.isPending}
-              className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50 disabled:bg-gray-100"
-            >
-              {exportMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4" />
-              )}
-              导出 EBK
-            </button>
-          )}
         </div>
 
         {selectedFormulas.size === 0 && enabledFormulas.length > 0 && (
@@ -308,77 +385,168 @@ export function ScreenPage() {
 
       {/* Results */}
       {screenMutation.data && (
-        <div className="rounded-lg bg-white shadow">
-          <div className="border-b border-gray-200 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">筛选结果</h2>
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <Filter className="h-4 w-4" />
-                交易日: {formatDate(screenMutation.data.trade_date)} | 共{' '}
-                {screenMutation.data.hits.length} 只股票
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          {/* Left: result list */}
+          <div className="lg:col-span-5">
+            <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow">
+              <div className="border-b border-gray-200 px-4 py-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <h2 className="text-lg font-semibold text-gray-900">筛选结果</h2>
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <Filter className="h-4 w-4" />
+                    交易日: {formatDate(screenMutation.data.trade_date)} | 共 {hits.length} 只
+                  </div>
+                </div>
               </div>
+
+              <div className="border-b border-gray-100 px-4 py-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleSelectAllHits}
+                    className="text-sm text-blue-600 hover:text-blue-800"
+                    disabled={hits.length === 0}
+                  >
+                    {selectedHits.size === hits.length && hits.length > 0 ? '取消全选' : '全选'}
+                  </button>
+                  <div className="text-sm text-gray-500">已选 {selectedHits.size}</div>
+                  <div className="flex-1" />
+                  <Link to="/watchlist" className="text-sm text-gray-500 hover:text-gray-700">
+                    打开自选
+                  </Link>
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <select
+                    value={targetGroupId}
+                    onChange={(e) => setTargetGroupId(e.target.value)}
+                    disabled={watchlistBusy || groups.length === 0}
+                    className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    {groups.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={handleAddSelectedToGroup}
+                    disabled={watchlistBusy || !targetGroupId || selectedHitItems.length === 0}
+                    className="h-9 rounded-md bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-400"
+                  >
+                    加入分组
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleCreateGroupFromSelected}
+                    disabled={watchlistBusy || selectedHitItems.length === 0}
+                    className="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100"
+                  >
+                    新建分组
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleExport}
+                    disabled={exportMutation.isPending || hits.length === 0}
+                    className="inline-flex h-9 items-center gap-2 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100"
+                  >
+                    {exportMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                    导出
+                  </button>
+                </div>
+
+                {watchlistError && (
+                  <div className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                    自选分组操作失败：{watchlistError}
+                  </div>
+                )}
+              </div>
+
+              {hits.length === 0 ? (
+                <div className="px-4 py-10 text-center text-sm text-gray-500">
+                  没有符合条件的股票
+                </div>
+              ) : (
+                <div className="max-h-[720px] overflow-auto">
+                  <ul className="divide-y divide-gray-100">
+                    {hits.map((hit: ScreenHit) => {
+                      const active = hit.ts_code === activeTsCode;
+                      const selected = selectedHits.has(hit.ts_code);
+                      return (
+                        <li
+                          key={hit.ts_code}
+                          className={active ? 'bg-blue-50' : 'hover:bg-gray-50'}
+                        >
+                          <div className="flex items-start gap-3 px-4 py-3">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleHit(hit.ts_code)}
+                              className="mt-0.5 flex-shrink-0"
+                              title={selected ? '取消选择' : '选择'}
+                            >
+                              {selected ? (
+                                <CheckSquare className="h-5 w-5 text-blue-600" />
+                              ) : (
+                                <Square className="h-5 w-5 text-gray-400" />
+                              )}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setActiveTsCode(hit.ts_code)}
+                              className="min-w-0 flex-1 text-left"
+                            >
+                              <div className="truncate text-sm font-medium text-gray-900">
+                                {formData.with_name && hit.name
+                                  ? `${hit.name} (${hit.ts_code})`
+                                  : hit.ts_code}
+                              </div>
+                              <div className="mt-1 truncate text-xs text-gray-500">
+                                {String(hit.rules ?? '-')}
+                              </div>
+                            </button>
+
+                            <Link
+                              to={`/stocks/${encodeURIComponent(hit.ts_code)}`}
+                              className="flex-shrink-0 text-sm text-blue-600 hover:text-blue-800"
+                              title="在新页面打开"
+                            >
+                              打开
+                            </Link>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
 
-          {screenMutation.data.hits.length === 0 ? (
-            <div className="px-6 py-12 text-center text-gray-500">
-              没有符合条件的股票
+          {/* Right: detail */}
+          <div className="lg:col-span-7">
+            <div className="rounded-lg border border-gray-200 bg-white p-4 shadow">
+              {activeTsCode ? (
+                <StockDetail
+                  tsCode={activeTsCode}
+                  variant="panel"
+                  onClose={() => setActiveTsCode(null)}
+                />
+              ) : (
+                <div className="flex h-[560px] items-center justify-center text-sm text-gray-500">
+                  从左侧选择一只股票查看K线
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                      序号
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                      代码
-                    </th>
-                    {formData.with_name && (
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                        名称
-                      </th>
-                    )}
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                      匹配规则
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                      操作
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
-                  {screenMutation.data.hits.map((hit: ScreenHit, index: number) => (
-                    <tr key={hit.ts_code} className="hover:bg-gray-50">
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                        {index + 1}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
-                        {hit.ts_code}
-                      </td>
-                      {formData.with_name && (
-                        <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                          {hit.name ?? '-'}
-                        </td>
-                      )}
-                      <td className="px-6 py-4 text-sm text-gray-500">
-                        {String(hit.rules ?? '-')}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm">
-                        <Link
-                          to={`/stocks/${encodeURIComponent(hit.ts_code)}`}
-                          className="text-blue-600 hover:text-blue-800"
-                        >
-                          查看详情
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          </div>
         </div>
       )}
     </div>

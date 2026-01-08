@@ -1,10 +1,11 @@
 import { Suspense } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Search, RefreshCw, Fish, List, FileCode } from 'lucide-react';
+import { LayoutDashboard, Search, RefreshCw, Fish, List, FileCode, Star } from 'lucide-react';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: '仪表盘' },
   { to: '/stocks', icon: List, label: '股票列表' },
+  { to: '/watchlist', icon: Star, label: '自选分组' },
   { to: '/formulas', icon: FileCode, label: '公式管理' },
   { to: '/screen', icon: Search, label: '股票筛选' },
   { to: '/update', icon: RefreshCw, label: '数据更新' },

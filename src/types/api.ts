@@ -165,3 +165,44 @@ export interface IndicatorSeriesResponse {
   points: IndicatorPoint[];
   lines?: IndicatorLine[];
 }
+
+export interface WatchlistItem {
+  ts_code: string;
+  name?: string | null;
+}
+
+export interface WatchlistGroup {
+  id: string;
+  name: string;
+  items: WatchlistItem[];
+  created_at: number;
+  updated_at: number;
+}
+
+export interface WatchlistGroupMeta {
+  id: string;
+  name: string;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface WatchlistStateResponse {
+  version: number;
+  groups: WatchlistGroup[];
+}
+
+export interface WatchlistGroupCreate {
+  name: string;
+}
+
+export interface WatchlistGroupUpdate {
+  name: string;
+}
+
+export interface WatchlistItemsUpsertRequest {
+  items: WatchlistItem[];
+}
+
+export interface WatchlistItemsRemoveRequest {
+  ts_codes: string[];
+}

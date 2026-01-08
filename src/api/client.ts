@@ -19,6 +19,10 @@ import type {
   FormulaValidateRequest,
   FormulaValidateResponse,
   IndicatorSeriesResponse,
+  WatchlistGroupMeta,
+  WatchlistItemsRemoveRequest,
+  WatchlistItemsUpsertRequest,
+  WatchlistStateResponse,
 } from '../types/api';
 
 // Get API base URL from environment or use default
@@ -178,6 +182,58 @@ class StockScreenerApi {
       `/v1/stocks/${encodeURIComponent(tsCode)}/indicators/${formulaId}`,
       { params }
     );
+    return data;
+  }
+
+  // Watchlist APIs
+  async getWatchlist(): Promise<WatchlistStateResponse> {
+    const { data } = await this.client.get<WatchlistStateResponse>('/v1/watchlist');
+    return data;
+  }
+
+  async createWatchlistGroup(name: string): Promise<WatchlistGroupMeta> {
+    const { data } = await this.client.post<WatchlistGroupMeta>('/v1/watchlist/groups', { name });
+    return data;
+  }
+
+  async updateWatchlistGroup(groupId: string, name: string): Promise<WatchlistGroupMeta> {
+    const { data } = await this.client.put<WatchlistGroupMeta>(
+      `/v1/watchlist/groups/${encodeURIComponent(groupId)}`,
+      { name }
+    );
+    return data;
+  }
+
+  async deleteWatchlistGroup(groupId: string): Promise<{ ok: boolean; deleted: string }> {
+    const { data } = await this.client.delete<{ ok: boolean; deleted: string }>(
+      `/v1/watchlist/groups/${encodeURIComponent(groupId)}`
+    );
+    return data;
+  }
+
+  async upsertWatchlistItems(
+    groupId: string,
+    request: WatchlistItemsUpsertRequest
+  ): Promise<{ ok: boolean; group_id: string; updated_at: number; total: number }> {
+    const { data } = await this.client.post<{
+      ok: boolean;
+      group_id: string;
+      updated_at: number;
+      total: number;
+    }>(`/v1/watchlist/groups/${encodeURIComponent(groupId)}/items`, request);
+    return data;
+  }
+
+  async removeWatchlistItems(
+    groupId: string,
+    request: WatchlistItemsRemoveRequest
+  ): Promise<{ ok: boolean; group_id: string; updated_at: number; removed: number }> {
+    const { data } = await this.client.post<{
+      ok: boolean;
+      group_id: string;
+      updated_at: number;
+      removed: number;
+    }>(`/v1/watchlist/groups/${encodeURIComponent(groupId)}/items/remove`, request);
     return data;
   }
 }

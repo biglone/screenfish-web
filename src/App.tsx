@@ -11,6 +11,10 @@ const StocksPage = lazy(async () => {
   const mod = await import('./pages/StocksPage');
   return { default: mod.StocksPage };
 });
+const WatchlistPage = lazy(async () => {
+  const mod = await import('./pages/WatchlistPage');
+  return { default: mod.WatchlistPage };
+});
 const StockDetailPage = lazy(async () => {
   const mod = await import('./pages/StockDetailPage');
   return { default: mod.StockDetailPage };
@@ -46,6 +50,7 @@ function App() {
             <Route index element={<DashboardPage />} />
             <Route path="stocks" element={<StocksPage />} />
             <Route path="stocks/:tsCode" element={<StockDetailPage />} />
+            <Route path="watchlist" element={<WatchlistPage />} />
             <Route path="formulas" element={<FormulasPage />} />
             <Route path="screen" element={<ScreenPage />} />
             <Route path="update" element={<UpdatePage />} />
