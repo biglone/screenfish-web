@@ -111,12 +111,14 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
   const indicatorLineSeriesRefs = useRef<Array<ISeriesApi<'Line'>>>([]);
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const kdjLineSeriesRefs = useRef<Array<ISeriesApi<'Line'>>>([]);
-  const mainAreaRatioRef = useRef<number>(1 - SUB_PANE_HEIGHT);
   const [hoverData, setHoverData] = useState<HoverData | null>(null);
   const [modalData, setModalData] = useState<ModalData | null>(null);
-  const [selectedIndicatorId, setSelectedIndicatorId] = useState<number | null>(null);
+  const [indicatorSelection, setIndicatorSelection] = useState<number | 'auto' | 'none'>('auto');
   const [showVolume, setShowVolume] = useState(true);
-  const [showKdj, setShowKdj] = useState(false);
+  const [showKdj, setShowKdj] = useState(true);
+  const mainAreaRatioRef = useRef<number>(
+    1 - ((showVolume ? 1 : 0) + (showKdj ? 1 : 0)) * SUB_PANE_HEIGHT
+  );
   const lastClickTime = useRef<number>(0);
   const lastClickDate = useRef<string | null>(null);
 
@@ -132,6 +134,17 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
     queryKey: ['formulas', 'indicator', 'enabled'],
     queryFn: () => api.listFormulas({ enabledOnly: true, kind: 'indicator' }),
   });
+
+  const indicatorFormulas = indicatorFormulasData?.formulas ?? [];
+  const defaultIndicatorId = indicatorFormulas[0]?.id ?? null;
+  const selectedIndicatorId =
+    typeof indicatorSelection === 'number'
+      ? indicatorFormulas.some((f) => f.id === indicatorSelection)
+        ? indicatorSelection
+        : defaultIndicatorId
+      : indicatorSelection === 'none'
+        ? null
+        : defaultIndicatorId;
 
   const {
     data: indicatorSeriesData,
@@ -549,9 +562,10 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
               <span className="text-sm text-gray-500">指标</span>
               <select
                 value={selectedIndicatorId ?? ''}
-                onChange={(e) =>
-                  setSelectedIndicatorId(e.target.value ? Number(e.target.value) : null)
-                }
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setIndicatorSelection(v ? Number(v) : 'none');
+                }}
                 disabled={!indicatorFormulasData?.formulas.length && !indicatorsLoading}
                 className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
               >

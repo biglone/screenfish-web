@@ -13,6 +13,8 @@ import {
   ToggleRight,
 } from 'lucide-react';
 import api from '../api/client';
+import { useHealth } from '../hooks/useApi';
+import { useMe } from '../hooks/useAuth';
 import type { FormulaItem, FormulaCreate, FormulaUpdate } from '../types/api';
 
 type ModalMode = 'create' | 'edit' | null;
@@ -29,6 +31,11 @@ function getErrorMessage(error: unknown): string {
 }
 
 export function FormulasPage() {
+  const health = useHealth();
+  const authEnabled = health.data?.auth_enabled === true;
+  const me = useMe(authEnabled);
+  const isAdmin = !authEnabled || me.data?.role === 'admin';
+
   const queryClient = useQueryClient();
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [editingFormula, setEditingFormula] = useState<FormulaItem | null>(null);
@@ -172,13 +179,17 @@ export function FormulasPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">公式管理</h1>
-        <button
-          onClick={openCreateModal}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4" />
-          新建公式
-        </button>
+        {isAdmin ? (
+          <button
+            onClick={openCreateModal}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4" />
+            新建公式
+          </button>
+        ) : (
+          <div className="text-sm text-gray-500">只读（需要管理员权限）</div>
+        )}
       </div>
 
       {/* Help Info */}
@@ -248,13 +259,13 @@ export function FormulasPage() {
                   <td className="whitespace-nowrap px-6 py-4">
                     <button
                       onClick={() => handleToggleEnabled(formula)}
-                      disabled={toggleMutation.isPending}
+                      disabled={!isAdmin || toggleMutation.isPending}
                       className={`transition-colors ${
                         formula.enabled
                           ? 'text-green-600 hover:text-green-700'
                           : 'text-gray-400 hover:text-gray-500'
                       }`}
-                      title={formula.enabled ? '点击禁用' : '点击启用'}
+                      title={!isAdmin ? '需要管理员权限' : formula.enabled ? '点击禁用' : '点击启用'}
                     >
                       {formula.enabled ? (
                         <ToggleRight className="h-6 w-6" />
@@ -287,7 +298,8 @@ export function FormulasPage() {
                     <div className="flex items-center justify-end gap-2">
                       <button
                         onClick={() => openEditModal(formula)}
-                        className="text-blue-600 hover:text-blue-800"
+                        disabled={!isAdmin}
+                        className="text-blue-600 hover:text-blue-800 disabled:cursor-not-allowed disabled:text-gray-400"
                         title="编辑"
                       >
                         <Pencil className="h-4 w-4" />
@@ -296,15 +308,16 @@ export function FormulasPage() {
                         <>
                           <button
                             onClick={() => deleteMutation.mutate(formula.id)}
-                            disabled={deleteMutation.isPending}
-                            className="text-red-600 hover:text-red-800"
+                            disabled={!isAdmin || deleteMutation.isPending}
+                            className="text-red-600 hover:text-red-800 disabled:cursor-not-allowed disabled:text-gray-400"
                             title="确认删除"
                           >
                             <Check className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => setDeleteConfirmId(null)}
-                            className="text-gray-600 hover:text-gray-800"
+                            disabled={!isAdmin}
+                            className="text-gray-600 hover:text-gray-800 disabled:cursor-not-allowed disabled:text-gray-400"
                             title="取消"
                           >
                             <X className="h-4 w-4" />
@@ -313,7 +326,8 @@ export function FormulasPage() {
                       ) : (
                         <button
                           onClick={() => setDeleteConfirmId(formula.id)}
-                          className="text-red-600 hover:text-red-800"
+                          disabled={!isAdmin}
+                          className="text-red-600 hover:text-red-800 disabled:cursor-not-allowed disabled:text-gray-400"
                           title="删除"
                         >
                           <Trash2 className="h-4 w-4" />

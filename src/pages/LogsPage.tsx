@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, RefreshCw } from 'lucide-react';
 import api from '../api/client';
+import { useHealth } from '../hooks/useApi';
+import { useMe } from '../hooks/useAuth';
 
 const ADMIN_TOKEN_STORAGE_KEY = 'screenfish_admin_token';
 
@@ -14,12 +16,17 @@ function getInitialAdminToken(): string {
 }
 
 export function LogsPage() {
+  const health = useHealth();
+  const authEnabled = health.data?.auth_enabled === true;
+  const me = useMe(authEnabled);
+  const isAdmin = !authEnabled || me.data?.role === 'admin';
+
   const [adminToken, setAdminToken] = useState(getInitialAdminToken);
   const [tailLines, setTailLines] = useState(200);
   const [follow, setFollow] = useState(true);
   const [filter, setFilter] = useState('');
 
-  const enabled = adminToken.trim().length > 0;
+  const enabled = isAdmin && adminToken.trim().length > 0;
 
   const logsQuery = useQuery({
     queryKey: ['admin', 'logs', 'backend', tailLines, adminToken],
@@ -66,6 +73,12 @@ export function LogsPage() {
         {headerRight}
       </div>
 
+      {!isAdmin && (
+        <div className="rounded-lg bg-yellow-50 p-4 text-sm text-yellow-800">
+          需要管理员权限（admin）才能查看日志页面。
+        </div>
+      )}
+
       <div className="rounded-lg bg-white p-6 shadow">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
           <div className="lg:col-span-5">
@@ -75,17 +88,19 @@ export function LogsPage() {
                 value={adminToken}
                 onChange={(e) => setAdminToken(e.target.value)}
                 placeholder="请输入后端设置的 STOCK_SCREENER_ADMIN_TOKEN"
+                disabled={!isAdmin}
                 className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
               <button
                 type="button"
                 onClick={handleSaveToken}
+                disabled={!isAdmin}
                 className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
               >
                 保存
               </button>
             </div>
-            {!enabled && (
+            {!enabled && isAdmin && (
               <div className="mt-2 text-xs text-gray-500">
                 需要配置后端环境变量 `STOCK_SCREENER_ENABLE_LOGS_API=1` 和 `STOCK_SCREENER_ADMIN_TOKEN` 才能使用。
               </div>
@@ -97,6 +112,7 @@ export function LogsPage() {
             <select
               value={tailLines}
               onChange={(e) => setTailLines(parseInt(e.target.value, 10))}
+              disabled={!isAdmin}
               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
               <option value={100}>100</option>
@@ -113,6 +129,7 @@ export function LogsPage() {
                 type="checkbox"
                 checked={follow}
                 onChange={(e) => setFollow(e.target.checked)}
+                disabled={!isAdmin}
                 className="h-4 w-4 text-blue-600"
               />
               跟随
@@ -126,6 +143,7 @@ export function LogsPage() {
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder="过滤关键字（本地）"
+              disabled={!isAdmin}
               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
@@ -167,4 +185,3 @@ export function LogsPage() {
     </div>
   );
 }
-

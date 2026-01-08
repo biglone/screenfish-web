@@ -1,11 +1,39 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Plus, Pencil, Trash2, Search, X } from 'lucide-react';
+import { Download, Plus, Pencil, Trash2, Search, X } from 'lucide-react';
 import api from '../api/client';
 import { useWatchlist } from '../hooks/useWatchlist';
 import { StockDetail } from '../components/StockDetail';
 import type { StockItem } from '../types/api';
+
+function tsCodeToEbkCode(tsCode: string): string {
+  const raw = tsCode.trim();
+  const [code, marketRaw] = raw.split('.', 2);
+  const market = (marketRaw ?? '').trim().toUpperCase();
+  const digits = code.trim();
+  if (!/^\d{6}$/.test(digits)) throw new Error(`invalid ts_code: ${tsCode}`);
+  if (market === 'SZ') return `0${digits}`;
+  if (market === 'SH') return `1${digits}`;
+  if (market === 'BJ') return `2${digits}`;
+  throw new Error(`unsupported ts_code market: ${tsCode}`);
+}
+
+function buildEbkContent(tsCodes: string[]): string {
+  const seen = new Set<string>();
+  const lines: string[] = [];
+  for (const tsCode of tsCodes) {
+    const ebk = tsCodeToEbkCode(tsCode);
+    if (seen.has(ebk)) continue;
+    seen.add(ebk);
+    lines.push(ebk);
+  }
+  return `\r\n${lines.join('\r\n')}`;
+}
+
+function safeFilename(x: string): string {
+  return x.replace(/[\\/:*?"<>|]+/g, '_').trim() || 'watchlist';
+}
 
 export function WatchlistPage() {
   const { groups, createGroup, renameGroup, deleteGroup, upsertItem, removeItems } =
@@ -144,13 +172,51 @@ export function WatchlistPage() {
     })();
   };
 
+  const handleExportEbk = () => {
+    if (!activeGroup) return;
+    const tsCodes = activeGroup.items.map((i) => String(i.ts_code ?? '').trim()).filter(Boolean);
+    if (tsCodes.length === 0) return;
+    try {
+      setWatchlistError(null);
+      const content = buildEbkContent(tsCodes);
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const now = new Date();
+      const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(
+        now.getDate()
+      ).padStart(2, '0')}`;
+      a.download = `${safeFilename(activeGroup.name)}_${stamp}.ebk`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setWatchlistError(msg);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-gray-900">自选分组</h1>
-        <Link to="/screen" className="text-sm text-gray-500 hover:text-gray-700">
-          去筛选并加入分组
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={handleExportEbk}
+            disabled={!activeGroup || activeGroup.items.length === 0}
+            className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100"
+            title={activeGroup ? `导出「${activeGroup.name}」` : '导出'}
+          >
+            <Download className="h-4 w-4" />
+            导出 EBK
+          </button>
+          <Link to="/screen" className="text-sm text-gray-500 hover:text-gray-700">
+            去筛选并加入分组
+          </Link>
+        </div>
       </div>
 
       {watchlistError && (

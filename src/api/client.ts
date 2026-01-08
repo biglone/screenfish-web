@@ -1,4 +1,4 @@
-import axios, { type AxiosInstance } from 'axios';
+import axios, { type AxiosInstance, type AxiosRequestHeaders } from 'axios';
 import type {
   StatusResponse,
   UpdateRequest,
@@ -10,6 +10,13 @@ import type {
   AvailabilityResponse,
   ExportEbkResponse,
   HealthResponse,
+  AuthLoginRequest,
+  AuthEmailCodeRequest,
+  AuthEmailCodeResponse,
+  AuthEmailRegisterRequest,
+  AuthRegisterRequest,
+  AuthTokenResponse,
+  AuthUserResponse,
   StockListResponse,
   StockDailyResponse,
   FormulaItem,
@@ -36,6 +43,36 @@ const getApiBaseUrl = () => {
   return '/api';
 };
 
+const AUTH_TOKEN_STORAGE_KEY = 'screenfish_auth_token';
+const AUTH_TOKEN_CHANGED_EVENT = 'screenfish_auth_token_changed';
+
+export function getStoredAuthToken(): string {
+  try {
+    return localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+export function setStoredAuthToken(token: string | null) {
+  try {
+    const t = (token ?? '').trim();
+    if (t) localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, t);
+    else localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event(AUTH_TOKEN_CHANGED_EVENT));
+    }
+  } catch {
+    // ignore
+  }
+}
+
+export function onAuthTokenChanged(handler: () => void) {
+  if (typeof window === 'undefined') return () => {};
+  window.addEventListener(AUTH_TOKEN_CHANGED_EVENT, handler);
+  return () => window.removeEventListener(AUTH_TOKEN_CHANGED_EVENT, handler);
+}
+
 class StockScreenerApi {
   private client: AxiosInstance;
 
@@ -48,9 +85,22 @@ class StockScreenerApi {
       },
     });
 
+    this.client.interceptors.request.use((config) => {
+      const token = getStoredAuthToken();
+      const headers = (config.headers ?? {}) as AxiosRequestHeaders;
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      else delete (headers as Record<string, unknown>)['Authorization'];
+      config.headers = headers;
+      return config;
+    });
+
     this.client.interceptors.response.use(
       (response) => response,
       (error) => {
+        const status = error?.response?.status;
+        if (status === 401) {
+          setStoredAuthToken(null);
+        }
         const detail = error?.response?.data?.detail;
         if (typeof detail === 'string' && detail.trim()) {
           error.message = detail;
@@ -64,8 +114,37 @@ class StockScreenerApi {
     this.client.defaults.headers['X-API-Key'] = apiKey;
   }
 
+  setAuthToken(token: string | null) {
+    setStoredAuthToken(token);
+  }
+
   async health(): Promise<HealthResponse> {
     const { data } = await this.client.get<HealthResponse>('/v1/health');
+    return data;
+  }
+
+  async register(request: AuthRegisterRequest): Promise<AuthTokenResponse> {
+    const { data } = await this.client.post<AuthTokenResponse>('/v1/auth/register', request);
+    return data;
+  }
+
+  async requestEmailCode(request: AuthEmailCodeRequest): Promise<AuthEmailCodeResponse> {
+    const { data } = await this.client.post<AuthEmailCodeResponse>('/v1/auth/email/request', request);
+    return data;
+  }
+
+  async registerWithEmail(request: AuthEmailRegisterRequest): Promise<AuthTokenResponse> {
+    const { data } = await this.client.post<AuthTokenResponse>('/v1/auth/register/email', request);
+    return data;
+  }
+
+  async login(request: AuthLoginRequest): Promise<AuthTokenResponse> {
+    const { data } = await this.client.post<AuthTokenResponse>('/v1/auth/login', request);
+    return data;
+  }
+
+  async me(): Promise<AuthUserResponse> {
+    const { data } = await this.client.get<AuthUserResponse>('/v1/auth/me');
     return data;
   }
 

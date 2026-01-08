@@ -71,6 +71,14 @@ export function ScreenPage() {
     return out;
   }, [screenMutation.data, selectedHits]);
 
+  const allHitItems = useMemo<WatchlistItem[]>(() => {
+    if (!screenMutation.data) return [];
+    return screenMutation.data.hits.map((hit) => ({
+      ts_code: hit.ts_code,
+      name: typeof hit.name === 'string' ? hit.name : null,
+    }));
+  }, [screenMutation.data]);
+
   const handleToggleFormula = (name: string) => {
     setSelectedFormulas((prev) => {
       const next = new Set(prev);
@@ -142,12 +150,22 @@ export function ScreenPage() {
   };
 
   const handleAddSelectedToGroup = () => {
+    if (!screenMutation.data) return;
     if (!targetGroupId) return;
+    const addingAll = selectedHits.size === 0;
+    const items = addingAll ? allHitItems : selectedHitItems;
+    if (items.length === 0) return;
+    if (
+      addingAll &&
+      !window.confirm(`未选择股票，将把全部 ${items.length} 只加入分组，继续？`)
+    ) {
+      return;
+    }
     void (async () => {
       try {
         setWatchlistError(null);
         setWatchlistBusy(true);
-        await addItems(targetGroupId, selectedHitItems);
+        await addItems(targetGroupId, items);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         setWatchlistError(msg);
@@ -159,6 +177,8 @@ export function ScreenPage() {
 
   const handleCreateGroupFromSelected = () => {
     if (!screenMutation.data) return;
+    const items = selectedHitItems.length > 0 ? selectedHitItems : allHitItems;
+    if (items.length === 0) return;
 
     const suggested = `筛选-${formatDate(screenMutation.data.trade_date)}`;
     const name = window.prompt('新建分组名称', suggested);
@@ -170,7 +190,7 @@ export function ScreenPage() {
         const id = await createGroup(name);
         if (!id) return;
         setTargetGroupId(id);
-        await addItems(id, selectedHitItems);
+        await addItems(id, items);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         setWatchlistError(msg);
@@ -432,20 +452,20 @@ export function ScreenPage() {
                   <button
                     type="button"
                     onClick={handleAddSelectedToGroup}
-                    disabled={watchlistBusy || !targetGroupId || selectedHitItems.length === 0}
+                    disabled={watchlistBusy || !targetGroupId || hits.length === 0}
                     className="h-9 rounded-md bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-400"
                   >
                     加入分组
                   </button>
 
-	                  <button
-	                    type="button"
-	                    onClick={handleCreateGroupFromSelected}
-	                    disabled={watchlistBusy}
-	                    className="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100"
-	                  >
-	                    新建分组
-	                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCreateGroupFromSelected}
+                    disabled={watchlistBusy || hits.length === 0}
+                    className="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100"
+                  >
+                    新建分组
+                  </button>
 
                   <button
                     type="button"

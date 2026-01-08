@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useUpdate, useUpdateWait, useStatus, useAvailability } from '../hooks/useApi';
+import { useUpdate, useUpdateWait, useStatus, useAvailability, useHealth } from '../hooks/useApi';
+import { useMe } from '../hooks/useAuth';
 import type { UpdateRequest, UpdateWaitRequest } from '../types/api';
 import {
   RefreshCw,
@@ -11,6 +12,11 @@ import {
 } from 'lucide-react';
 
 export function UpdatePage() {
+  const health = useHealth();
+  const authEnabled = health.data?.auth_enabled === true;
+  const me = useMe(authEnabled);
+  const isAdmin = !authEnabled || me.data?.role === 'admin';
+
   const { data: status, refetch: refetchStatus } = useStatus();
   const updateMutation = useUpdate();
   const updateWaitMutation = useUpdateWait();
@@ -60,6 +66,12 @@ export function UpdatePage() {
         <h1 className="text-2xl font-bold text-gray-900">数据更新</h1>
       </div>
 
+      {!isAdmin && (
+        <div className="rounded-lg bg-yellow-50 p-4 text-sm text-yellow-800">
+          需要管理员权限（admin）才能执行数据更新。
+        </div>
+      )}
+
       {/* Current Status */}
       <div className="rounded-lg bg-blue-50 p-4">
         <div className="flex items-start gap-3">
@@ -76,6 +88,7 @@ export function UpdatePage() {
       </div>
 
       {/* Update Form */}
+      {isAdmin && (
       <div className="rounded-lg bg-white p-6 shadow">
         <div className="mb-4">
           <div className="flex gap-4">
@@ -239,6 +252,7 @@ export function UpdatePage() {
           </button>
         </div>
       </div>
+      )}
 
       {/* Check Availability */}
       <div className="rounded-lg bg-white p-6 shadow">

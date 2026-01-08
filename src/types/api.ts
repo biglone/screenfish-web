@@ -74,6 +74,48 @@ export interface ExportEbkResponse {
 
 export interface HealthResponse {
   status: string;
+  auth_enabled?: boolean;
+  auth_signup_mode?: 'open' | 'email' | 'closed' | null;
+  auth_bootstrap?: boolean;
+}
+
+export interface AuthUserResponse {
+  id: string;
+  username: string;
+  role: 'admin' | 'user';
+}
+
+export interface AuthTokenResponse {
+  token: string;
+  expires_at: number;
+  user: AuthUserResponse;
+}
+
+export interface AuthRegisterRequest {
+  username: string;
+  password: string;
+}
+
+export interface AuthLoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface AuthEmailCodeRequest {
+  email: string;
+}
+
+export interface AuthEmailCodeResponse {
+  ok: boolean;
+  expires_at: number;
+  debug_code?: string | null;
+}
+
+export interface AuthEmailRegisterRequest {
+  email: string;
+  code: string;
+  username: string;
+  password: string;
 }
 
 export interface StockItem {

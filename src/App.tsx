@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { lazy } from 'react';
 import { Layout } from './components/Layout';
+import { RequireAuth } from './components/RequireAuth';
 
 const DashboardPage = lazy(async () => {
   const mod = await import('./pages/DashboardPage');
@@ -35,6 +36,10 @@ const LogsPage = lazy(async () => {
   const mod = await import('./pages/LogsPage');
   return { default: mod.LogsPage };
 });
+const AuthPage = lazy(async () => {
+  const mod = await import('./pages/AuthPage');
+  return { default: mod.AuthPage };
+});
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -50,7 +55,8 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Layout />}>
+          <Route path="/auth" element={<AuthPage />} />
+          <Route path="/" element={<RequireAuth><Layout /></RequireAuth>}>
             <Route index element={<DashboardPage />} />
             <Route path="stocks" element={<StocksPage />} />
             <Route path="stocks/:tsCode" element={<StockDetailPage />} />
