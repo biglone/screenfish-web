@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Plus, Pencil, Trash2, Search, X } from 'lucide-react';
+import api from '../api/client';
 import { useWatchlist } from '../hooks/useWatchlist';
 import { StockDetail } from '../components/StockDetail';
+import type { StockItem } from '../types/api';
 
 export function WatchlistPage() {
   const { groups, createGroup, renameGroup, deleteGroup, upsertItem, removeItems } =
@@ -15,6 +18,16 @@ export function WatchlistPage() {
   const [watchlistError, setWatchlistError] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
   const [addCode, setAddCode] = useState('');
+
+  const stockSearch = filter.trim();
+  const stockSearchQuery = useQuery({
+    queryKey: ['stocks', 'search', stockSearch],
+    queryFn: () => api.listStocks({ search: stockSearch, limit: 20, offset: 0 }),
+    enabled: stockSearch.length > 0,
+    staleTime: 10_000,
+    retry: 1,
+  });
+  const stockSearchResults = stockSearchQuery.data?.stocks ?? [];
 
   const activeGroup = useMemo(() => {
     if (groups.length === 0) return null;
@@ -70,14 +83,65 @@ export function WatchlistPage() {
     if (activeGroupId === groupId) setActiveGroupId(null);
   };
 
+  const handleAddStock = (stock: StockItem) => {
+    if (!activeGroup) return;
+    void (async () => {
+      try {
+        setWatchlistError(null);
+        setWatchlistBusy(true);
+        await upsertItem(activeGroup.id, { ts_code: stock.ts_code, name: stock.name });
+        setActiveTsCode(stock.ts_code);
+        setAutoSelectDetail(true);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setWatchlistError(msg);
+      } finally {
+        setWatchlistBusy(false);
+      }
+    })();
+  };
+
   const handleAddCode = (e: React.FormEvent) => {
     e.preventDefault();
-    const code = addCode.trim();
-    if (!code || !activeGroup) return;
-    upsertItem(activeGroup.id, { ts_code: code });
-    setAddCode('');
-    setActiveTsCode(code);
-    setAutoSelectDetail(true);
+    if (!activeGroup) return;
+    const raw = addCode.trim();
+    if (!raw) return;
+    void (async () => {
+      try {
+        setWatchlistError(null);
+        setWatchlistBusy(true);
+
+        const q = raw.toUpperCase();
+        const isFullTsCode = /^\d{6}\.(SZ|SH|BJ)$/.test(q);
+
+        const res = await api.listStocks({ search: q, limit: 20, offset: 0 });
+        const stocks = res.stocks ?? [];
+        if (stocks.length === 0) {
+          throw new Error(isFullTsCode ? `未找到 ts_code：${q}` : `未找到股票：${raw}`);
+        }
+
+        const exact = stocks.find((s) => s.ts_code.toUpperCase() === q) ?? null;
+        const target = exact ?? (stocks.length === 1 ? stocks[0] : null);
+        if (!target) {
+          const sample = stocks
+            .slice(0, 5)
+            .map((s) => s.ts_code)
+            .join('，');
+          const more = stocks.length > 5 ? '…' : '';
+          throw new Error(`匹配到 ${stocks.length} 个结果，请输入完整 ts_code（例如：${sample}${more}）`);
+        }
+
+        await upsertItem(activeGroup.id, { ts_code: target.ts_code, name: target.name });
+        setAddCode('');
+        setActiveTsCode(target.ts_code);
+        setAutoSelectDetail(true);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setWatchlistError(msg);
+      } finally {
+        setWatchlistBusy(false);
+      }
+    })();
   };
 
   return (
@@ -156,33 +220,67 @@ export function WatchlistPage() {
             <div className="border-t border-gray-200 px-4 py-3">
               <div className="mb-2 text-sm font-semibold text-gray-900">股票</div>
 
-              <div className="mb-3 flex gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                  <input
-                    value={filter}
-                    onChange={(e) => setFilter(e.target.value)}
-                    placeholder="搜索代码/名称..."
-                    className="w-full rounded-md border border-gray-300 py-2 pl-10 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
+	              <div className="mb-3 flex gap-2">
+	                <div className="relative flex-1">
+	                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+	                  <input
+	                    value={filter}
+	                    onChange={(e) => setFilter(e.target.value)}
+	                    placeholder="搜索代码/名称..."
+	                    className="w-full rounded-md border border-gray-300 py-2 pl-10 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+	                  />
+	                </div>
+	              </div>
 
-              <form onSubmit={handleAddCode} className="mb-3 flex gap-2">
-                <input
-                  value={addCode}
-                  onChange={(e) => setAddCode(e.target.value)}
-                  placeholder="输入 ts_code 添加..."
-                  className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-                <button
-                  type="submit"
-                  disabled={!activeGroup || addCode.trim().length === 0}
-                  className="rounded-md bg-gray-900 px-3 py-2 text-sm text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-400"
-                >
-                  添加
-                </button>
-              </form>
+	              {stockSearch && (
+	                <div className="mb-3 rounded-md border border-gray-200 bg-gray-50 p-2">
+	                  <div className="mb-2 text-xs font-semibold text-gray-600">搜索结果</div>
+	                  {stockSearchQuery.isFetching ? (
+	                    <div className="text-xs text-gray-500">搜索中...</div>
+	                  ) : stockSearchResults.length === 0 ? (
+	                    <div className="text-xs text-gray-500">未找到相关股票</div>
+	                  ) : (
+	                    <ul className="space-y-1">
+	                      {stockSearchResults.slice(0, 8).map((s) => {
+	                        const inGroup = activeGroup?.items.some((i) => i.ts_code === s.ts_code) ?? false;
+	                        return (
+	                          <li key={s.ts_code} className="flex items-center justify-between gap-2">
+	                            <div className="min-w-0 flex-1">
+	                              <div className="truncate text-sm text-gray-900">
+	                                {s.name ? `${s.name} (${s.ts_code})` : s.ts_code}
+	                              </div>
+	                            </div>
+	                            <button
+	                              type="button"
+	                              onClick={() => handleAddStock(s)}
+	                              disabled={!activeGroup || inGroup || watchlistBusy}
+	                              className="h-7 rounded-md bg-blue-600 px-2 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-400"
+	                            >
+	                              {inGroup ? '已在组内' : '添加'}
+	                            </button>
+	                          </li>
+	                        );
+	                      })}
+	                    </ul>
+	                  )}
+	                </div>
+	              )}
+
+	              <form onSubmit={handleAddCode} className="mb-3 flex gap-2">
+	                <input
+	                  value={addCode}
+	                  onChange={(e) => setAddCode(e.target.value)}
+	                  placeholder="输入 ts_code/名称 添加..."
+	                  className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+	                />
+	                <button
+	                  type="submit"
+	                  disabled={!activeGroup || watchlistBusy || addCode.trim().length === 0}
+	                  className="rounded-md bg-gray-900 px-3 py-2 text-sm text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-400"
+	                >
+	                  添加
+	                </button>
+	              </form>
 
               <div className="max-h-[520px] overflow-auto">
                 {activeGroup && filteredItems.length === 0 ? (
