@@ -49,3 +49,14 @@ npm run dev
 
 - Cloudflare Tunnel（named tunnel）把 `screenfish.biglone.tech` 指向 `http://127.0.0.1:5174`
 - Caddy 监听 `127.0.0.1:5174`，静态托管 `dist/`，并将 `/api/*` 反代到后端 `127.0.0.1:8001`
+
+## 同事手动部署/启停（本机生产）
+
+在服务器上（以同一个 Linux 用户运行）：
+
+```bash
+cd ~/workspace/screenfish-web
+./scripts/screenfish-prod.sh deploy
+./scripts/screenfish-prod.sh status
+./scripts/screenfish-prod.sh logs backend -f
+```
