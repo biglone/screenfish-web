@@ -11,6 +11,8 @@ export function WatchlistPage() {
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [activeTsCode, setActiveTsCode] = useState<string | null>(null);
   const [autoSelectDetail, setAutoSelectDetail] = useState(true);
+  const [watchlistBusy, setWatchlistBusy] = useState(false);
+  const [watchlistError, setWatchlistError] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
   const [addCode, setAddCode] = useState('');
 
@@ -42,8 +44,17 @@ export function WatchlistPage() {
     const name = window.prompt('新建分组名称', '新分组');
     if (!name) return;
     void (async () => {
-      const id = await createGroup(name);
-      if (id) setActiveGroupId(id);
+      try {
+        setWatchlistError(null);
+        setWatchlistBusy(true);
+        const id = await createGroup(name);
+        if (id) setActiveGroupId(id);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setWatchlistError(msg);
+      } finally {
+        setWatchlistBusy(false);
+      }
     })();
   };
 
@@ -78,6 +89,12 @@ export function WatchlistPage() {
         </Link>
       </div>
 
+      {watchlistError && (
+        <div className="rounded-lg bg-red-50 p-4 text-red-700">
+          自选分组操作失败：{watchlistError}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* Left: groups + list */}
         <div className="lg:col-span-4">
@@ -87,7 +104,8 @@ export function WatchlistPage() {
               <button
                 type="button"
                 onClick={handleCreateGroup}
-                className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-2 py-1 text-sm text-white hover:bg-blue-700"
+                disabled={watchlistBusy}
+                className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-2 py-1 text-sm text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-400"
               >
                 <Plus className="h-4 w-4" />
                 新建

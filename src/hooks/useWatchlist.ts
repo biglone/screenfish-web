@@ -1,9 +1,10 @@
 import { useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../api/client';
-import type { WatchlistGroup, WatchlistItem } from '../types/api';
+import type { WatchlistGroup, WatchlistItem, WatchlistStateResponse } from '../types/api';
 
 const watchlistQueryKey = ['watchlist'] as const;
+const EMPTY_GROUPS: WatchlistGroup[] = [];
 
 export type UseWatchlist = {
   groups: WatchlistGroup[];
@@ -28,7 +29,7 @@ export function useWatchlist(): UseWatchlist {
     retry: 1,
   });
 
-  const groups = watchlistQuery.data?.groups ?? [];
+  const groups = watchlistQuery.data?.groups ?? EMPTY_GROUPS;
 
   const refresh = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: watchlistQueryKey });
@@ -37,6 +38,11 @@ export function useWatchlist(): UseWatchlist {
   const createGroup = useCallback(
     async (name: string) => {
       const group = await api.createWatchlistGroup(name);
+      queryClient.setQueryData<WatchlistStateResponse>(watchlistQueryKey, (prev) => {
+        const nextGroup = { ...group, items: [] };
+        if (!prev) return { version: 1, groups: [nextGroup] };
+        return { ...prev, groups: [nextGroup, ...prev.groups.filter((g) => g.id !== group.id)] };
+      });
       await queryClient.invalidateQueries({ queryKey: watchlistQueryKey });
       return group.id ?? null;
     },
@@ -109,4 +115,3 @@ export function useWatchlist(): UseWatchlist {
     ]
   );
 }
-

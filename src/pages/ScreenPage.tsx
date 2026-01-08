@@ -159,7 +159,6 @@ export function ScreenPage() {
 
   const handleCreateGroupFromSelected = () => {
     if (!screenMutation.data) return;
-    if (selectedHitItems.length === 0) return;
 
     const suggested = `筛选-${formatDate(screenMutation.data.trade_date)}`;
     const name = window.prompt('新建分组名称', suggested);
@@ -439,14 +438,14 @@ export function ScreenPage() {
                     加入分组
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={handleCreateGroupFromSelected}
-                    disabled={watchlistBusy || selectedHitItems.length === 0}
-                    className="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100"
-                  >
-                    新建分组
-                  </button>
+	                  <button
+	                    type="button"
+	                    onClick={handleCreateGroupFromSelected}
+	                    disabled={watchlistBusy}
+	                    className="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100"
+	                  >
+	                    新建分组
+	                  </button>
 
                   <button
                     type="button"
