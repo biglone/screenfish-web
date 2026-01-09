@@ -167,20 +167,30 @@ if [ "${DEPLOY_FRONTEND}" -eq 1 ]; then
 fi
 
 info "waiting for health (timeout: ${WAIT_SECONDS}s)..."
-python3 - <<PY
+PROD_HOST="${HOST}" \
+PROD_BACKEND_PORT="${BACKEND_PORT}" \
+PROD_GATEWAY_PORT="${GATEWAY_PORT}" \
+PROD_WAIT_SECONDS="${WAIT_SECONDS}" \
+DEPLOY_BACKEND="${DEPLOY_BACKEND}" \
+DEPLOY_FRONTEND="${DEPLOY_FRONTEND}" \
+python3 - <<'PY'
 import json
+import os
 import time
 import urllib.request
 
-host = ${HOST!r}
-backend_port = int(${BACKEND_PORT!r})
-gateway_port = int(${GATEWAY_PORT!r})
-wait_seconds = float(${WAIT_SECONDS!r})
+host = os.environ.get("PROD_HOST", "127.0.0.1")
+backend_port = int(os.environ.get("PROD_BACKEND_PORT", "8001"))
+gateway_port = int(os.environ.get("PROD_GATEWAY_PORT", "5174"))
+wait_seconds = float(os.environ.get("PROD_WAIT_SECONDS", "60"))
 
 urls = []
-if ${DEPLOY_BACKEND}:
+deploy_backend = os.environ.get("DEPLOY_BACKEND", "0") == "1"
+deploy_frontend = os.environ.get("DEPLOY_FRONTEND", "0") == "1"
+
+if deploy_backend:
     urls.append(("backend", f"http://{host}:{backend_port}/v1/health"))
-if ${DEPLOY_FRONTEND}:
+if deploy_frontend:
     urls.append(("gateway", f"http://{host}:{gateway_port}/api/v1/health"))
 
 deadline = time.time() + wait_seconds
@@ -211,4 +221,3 @@ PY
 info "done. Local view (on your laptop):"
 info "  ssh -L ${GATEWAY_PORT}:127.0.0.1:${GATEWAY_PORT} <user>@<server>"
 info "  open: http://localhost:${GATEWAY_PORT}"
-
