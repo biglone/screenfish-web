@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Download, Plus, Pencil, Trash2, Search, X } from 'lucide-react';
@@ -35,6 +35,13 @@ function safeFilename(x: string): string {
   return x.replace(/[\\/:*?"<>|]+/g, '_').trim() || 'watchlist';
 }
 
+const WATCHLIST_PANE_WIDTH_STORAGE_KEY = 'screenfish.watchlist.leftPaneWidth';
+const DEFAULT_LEFT_PANE_WIDTH = 360;
+const MIN_LEFT_PANE_WIDTH = 240;
+const MIN_RIGHT_PANE_WIDTH = 520;
+const RESIZER_WIDTH_PX = 12;
+const RESIZER_STEP_PX = 24;
+
 export function WatchlistPage() {
   const { groups, createGroup, renameGroup, deleteGroup, upsertItem, removeItems } =
     useWatchlist();
@@ -46,6 +53,148 @@ export function WatchlistPage() {
   const [watchlistError, setWatchlistError] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
   const [addCode, setAddCode] = useState('');
+
+  const splitContainerRef = useRef<HTMLDivElement>(null);
+  const [splitEnabled, setSplitEnabled] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia?.('(min-width: 1024px)')?.matches ?? false;
+  });
+
+  const clampLeftPaneWidth = useCallback((rawWidth: number) => {
+    const containerWidth = splitContainerRef.current?.clientWidth ?? 0;
+    const maxByContainer =
+      containerWidth > 0 ? containerWidth - MIN_RIGHT_PANE_WIDTH - RESIZER_WIDTH_PX : Infinity;
+    const maxWidth = Math.max(MIN_LEFT_PANE_WIDTH, maxByContainer);
+    return Math.max(MIN_LEFT_PANE_WIDTH, Math.min(rawWidth, maxWidth));
+  }, []);
+
+  const [leftPaneWidth, setLeftPaneWidth] = useState<number>(() => {
+    if (typeof window === 'undefined') return DEFAULT_LEFT_PANE_WIDTH;
+    const saved = Number(window.localStorage.getItem(WATCHLIST_PANE_WIDTH_STORAGE_KEY));
+    if (Number.isFinite(saved) && saved > 0) return saved;
+    return DEFAULT_LEFT_PANE_WIDTH;
+  });
+
+  const resizeDragRef = useRef<{ pointerId: number; startX: number; startWidth: number } | null>(
+    null
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const update = () => setSplitEnabled(mq.matches);
+    update();
+    if (mq.addEventListener) mq.addEventListener('change', update);
+    else mq.addListener(update);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', update);
+      else mq.removeListener(update);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!splitEnabled) return;
+    setLeftPaneWidth((w) => clampLeftPaneWidth(w));
+  }, [clampLeftPaneWidth, splitEnabled]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!splitEnabled) return;
+    window.localStorage.setItem(WATCHLIST_PANE_WIDTH_STORAGE_KEY, String(leftPaneWidth));
+  }, [leftPaneWidth, splitEnabled]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!splitEnabled) return;
+    const onResize = () => setLeftPaneWidth((w) => clampLeftPaneWidth(w));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [clampLeftPaneWidth, splitEnabled]);
+
+  const endResizeDrag = useCallback(() => {
+    if (!resizeDragRef.current) return;
+    resizeDragRef.current = null;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }, []);
+
+  useEffect(() => {
+    return () => endResizeDrag();
+  }, [endResizeDrag]);
+
+  const handleResizerPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.button !== 0) return;
+      resizeDragRef.current = { pointerId: e.pointerId, startX: e.clientX, startWidth: leftPaneWidth };
+      e.currentTarget.setPointerCapture(e.pointerId);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    },
+    [leftPaneWidth]
+  );
+
+  const handleResizerPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const drag = resizeDragRef.current;
+      if (!drag || drag.pointerId !== e.pointerId) return;
+      const nextWidth = drag.startWidth + (e.clientX - drag.startX);
+      setLeftPaneWidth(clampLeftPaneWidth(nextWidth));
+    },
+    [clampLeftPaneWidth]
+  );
+
+  const handleResizerPointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      endResizeDrag();
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {
+        // ignore
+      }
+    },
+    [endResizeDrag]
+  );
+
+  const handleResizerPointerCancel = useCallback(() => {
+    endResizeDrag();
+  }, [endResizeDrag]);
+
+  const handleResizerDoubleClick = useCallback(() => {
+    setLeftPaneWidth(clampLeftPaneWidth(DEFAULT_LEFT_PANE_WIDTH));
+  }, [clampLeftPaneWidth]);
+
+  const handleResizerKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      const step = (e.shiftKey ? 3 : 1) * RESIZER_STEP_PX;
+      if (e.key === 'ArrowLeft') {
+        setLeftPaneWidth((w) => clampLeftPaneWidth(w - step));
+        e.preventDefault();
+        return;
+      }
+      if (e.key === 'ArrowRight') {
+        setLeftPaneWidth((w) => clampLeftPaneWidth(w + step));
+        e.preventDefault();
+        return;
+      }
+      if (e.key === 'Home') {
+        setLeftPaneWidth(clampLeftPaneWidth(MIN_LEFT_PANE_WIDTH));
+        e.preventDefault();
+        return;
+      }
+      if (e.key === 'End') {
+        const containerWidth = splitContainerRef.current?.clientWidth ?? 0;
+        const maxByContainer =
+          containerWidth > 0
+            ? containerWidth - MIN_RIGHT_PANE_WIDTH - RESIZER_WIDTH_PX
+            : DEFAULT_LEFT_PANE_WIDTH;
+        setLeftPaneWidth(clampLeftPaneWidth(maxByContainer));
+        e.preventDefault();
+        return;
+      }
+    },
+    [clampLeftPaneWidth]
+  );
 
   const stockSearch = filter.trim();
   const stockSearchQuery = useQuery({
@@ -256,9 +405,15 @@ export function WatchlistPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+      <div
+        ref={splitContainerRef}
+        className="grid grid-cols-1 gap-6 lg:gap-0 lg:grid-cols-[var(--watchlist-left-pane)_12px_minmax(0,1fr)]"
+        style={
+          { ['--watchlist-left-pane' as never]: `${leftPaneWidth}px` } as React.CSSProperties
+        }
+      >
         {/* Left: groups + list */}
-        <div className="lg:col-span-4">
+        <div className="min-w-0">
           <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow">
             <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
               <div className="text-sm font-semibold text-gray-900">分组</div>
@@ -429,8 +584,28 @@ export function WatchlistPage() {
           </div>
         </div>
 
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="调整左右区域宽度"
+          tabIndex={0}
+          className="hidden select-none lg:flex"
+          onPointerDown={handleResizerPointerDown}
+          onPointerMove={handleResizerPointerMove}
+          onPointerUp={handleResizerPointerUp}
+          onPointerCancel={handleResizerPointerCancel}
+          onDoubleClick={handleResizerDoubleClick}
+          onKeyDown={handleResizerKeyDown}
+          style={{ touchAction: 'none' }}
+          title="拖动调整宽度（双击重置）"
+        >
+          <div className="group relative h-full w-full cursor-col-resize rounded-md hover:bg-gray-50">
+            <div className="absolute inset-y-2 left-1/2 w-px -translate-x-1/2 bg-gray-200 group-hover:bg-blue-500" />
+          </div>
+        </div>
+
         {/* Right: detail */}
-        <div className="lg:col-span-8">
+        <div className="min-w-0">
           <div className="rounded-lg border border-gray-200 bg-white p-4 shadow">
             {resolvedActiveTsCode ? (
               <StockDetail

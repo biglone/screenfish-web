@@ -411,18 +411,32 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
     chart.subscribeClick(handleChartClick);
 
     // Handle resize
-    const handleResize = () => {
-      if (chartContainerRef.current && chartRef.current) {
-        chartRef.current.applyOptions({
-          width: chartContainerRef.current.clientWidth || 600,
-        });
-      }
+    let resizeRafId: number | null = null;
+    const scheduleResize = () => {
+      if (resizeRafId !== null) return;
+      resizeRafId = window.requestAnimationFrame(() => {
+        resizeRafId = null;
+        if (chartContainerRef.current && chartRef.current) {
+          chartRef.current.applyOptions({
+            width: chartContainerRef.current.clientWidth || 600,
+          });
+        }
+      });
     };
 
-    window.addEventListener('resize', handleResize);
+    window.addEventListener('resize', scheduleResize);
+
+    const resizeObserver =
+      typeof ResizeObserver !== 'undefined' ? new ResizeObserver(scheduleResize) : null;
+    if (resizeObserver && chartContainerRef.current) {
+      resizeObserver.observe(chartContainerRef.current);
+    }
+    scheduleResize();
 
     return () => {
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('resize', scheduleResize);
+      if (resizeObserver) resizeObserver.disconnect();
+      if (resizeRafId !== null) window.cancelAnimationFrame(resizeRafId);
       if (chartRef.current) {
         chartRef.current.unsubscribeCrosshairMove(handleCrosshairMove);
         chartRef.current.unsubscribeClick(handleChartClick);
