@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Download, Plus, Pencil, Trash2, Search, X } from 'lucide-react';
@@ -80,6 +80,37 @@ export function WatchlistPage() {
       return code.includes(q) || name.includes(q);
     });
   }, [activeGroup, filter]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      if (!resolvedActiveTsCode) return;
+      if (filteredItems.length === 0) return;
+
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName ?? '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return;
+
+      const tsCodes = filteredItems.map((x) => x.ts_code);
+      const currentIndex = tsCodes.indexOf(resolvedActiveTsCode);
+      const currentResolved = currentIndex === -1 ? 0 : currentIndex;
+      const nextIndex = e.key === 'ArrowDown' ? currentResolved + 1 : currentResolved - 1;
+      if (nextIndex < 0 || nextIndex >= tsCodes.length) return;
+
+      const nextTsCode = tsCodes[nextIndex];
+      setActiveTsCode(nextTsCode);
+      setAutoSelectDetail(true);
+      document
+        .querySelector<HTMLElement>(`[data-ts-code="${nextTsCode}"]`)
+        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      e.preventDefault();
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [filteredItems, resolvedActiveTsCode]);
 
   const handleCreateGroup = () => {
     const name = window.prompt('新建分组名称', '新分组');
@@ -352,14 +383,18 @@ export function WatchlistPage() {
                 {activeGroup && filteredItems.length === 0 ? (
                   <div className="py-6 text-center text-sm text-gray-500">暂无股票</div>
                 ) : (
-                  <ul className="divide-y divide-gray-100">
-                    {filteredItems.map((item) => {
-                      const active = item.ts_code === resolvedActiveTsCode;
-                      return (
-                        <li key={item.ts_code} className={active ? 'bg-gray-50' : ''}>
-                          <div className="flex items-center justify-between gap-2 px-3 py-2">
-                            <button
-                              type="button"
+	                  <ul className="divide-y divide-gray-100">
+	                    {filteredItems.map((item) => {
+	                      const active = item.ts_code === resolvedActiveTsCode;
+	                      return (
+	                        <li
+                            key={item.ts_code}
+                            data-ts-code={item.ts_code}
+                            className={active ? 'bg-gray-50' : ''}
+                          >
+	                          <div className="flex items-center justify-between gap-2 px-3 py-2">
+	                            <button
+	                              type="button"
                               onClick={() => {
                                 setActiveTsCode(item.ts_code);
                                 setAutoSelectDetail(true);

@@ -48,6 +48,36 @@ export function ScreenPage() {
   const hits = screenMutation.data?.hits ?? [];
 
   useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      if (!activeTsCode) return;
+      if (hits.length === 0) return;
+
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName ?? '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return;
+
+      const tsCodes = hits.map((x) => x.ts_code);
+      const currentIndex = tsCodes.indexOf(activeTsCode);
+      if (currentIndex === -1) return;
+      const nextIndex = e.key === 'ArrowDown' ? currentIndex + 1 : currentIndex - 1;
+      if (nextIndex < 0 || nextIndex >= tsCodes.length) return;
+
+      const nextTsCode = tsCodes[nextIndex];
+      setActiveTsCode(nextTsCode);
+      document
+        .querySelector<HTMLElement>(`[data-ts-code="${nextTsCode}"]`)
+        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      e.preventDefault();
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [activeTsCode, hits]);
+
+  useEffect(() => {
     if (!targetGroupId && groups.length > 0) setTargetGroupId(groups[0].id);
   }, [groups, targetGroupId]);
 
@@ -496,14 +526,15 @@ export function ScreenPage() {
               ) : (
                 <div className="max-h-[720px] overflow-auto">
                   <ul className="divide-y divide-gray-100">
-                    {hits.map((hit: ScreenHit) => {
-                      const active = hit.ts_code === activeTsCode;
-                      const selected = selectedHits.has(hit.ts_code);
-                      return (
-                        <li
-                          key={hit.ts_code}
-                          className={active ? 'bg-blue-50' : 'hover:bg-gray-50'}
-                        >
+	                    {hits.map((hit: ScreenHit) => {
+	                      const active = hit.ts_code === activeTsCode;
+	                      const selected = selectedHits.has(hit.ts_code);
+	                      return (
+	                        <li
+	                          key={hit.ts_code}
+                              data-ts-code={hit.ts_code}
+	                          className={active ? 'bg-blue-50' : 'hover:bg-gray-50'}
+	                        >
                           <div className="flex items-start gap-3 px-4 py-3">
                             <button
                               type="button"
