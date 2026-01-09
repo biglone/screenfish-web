@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -13,6 +13,16 @@ export function StocksPage() {
   const [searchInput, setSearchInput] = useState('');
   const [page, setPage] = useState(0);
   const queryClient = useQueryClient();
+
+  const stockDetailQuery = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set('from', 'stocks');
+    if (search) params.set('search', search);
+    params.set('page', String(page));
+    params.set('limit', String(PAGE_SIZE));
+    const qs = params.toString();
+    return qs ? `?${qs}` : '';
+  }, [page, search]);
 
   const { data, isLoading, isFetching, error } = useQuery({
     queryKey: ['stocks', search, page],
@@ -82,22 +92,22 @@ export function StocksPage() {
       {data && (
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
           {/* Mobile cards */}
-          <ul className="divide-y divide-gray-200 sm:hidden">
-            {data.stocks.map((stock) => (
-              <li key={stock.ts_code} className="px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
+	          <ul className="divide-y divide-gray-200 sm:hidden">
+	            {data.stocks.map((stock) => (
+	              <li key={stock.ts_code} className="px-4 py-3">
+	                <div className="flex items-center justify-between gap-3">
+	                  <div className="min-w-0">
                     <div className="truncate text-sm font-medium text-gray-900">
                       {stock.name || '-'}
                     </div>
                     <div className="mt-1 font-mono text-xs text-gray-500">{stock.ts_code}</div>
-                  </div>
-                  <Link
-                    to={`/stocks/${encodeURIComponent(stock.ts_code)}`}
-                    className="flex-shrink-0 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-blue-600 hover:bg-gray-50 hover:text-blue-800"
-                  >
-                    查看
-                  </Link>
+	                  </div>
+	                  <Link
+	                    to={`/stocks/${encodeURIComponent(stock.ts_code)}${stockDetailQuery}`}
+	                    className="flex-shrink-0 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-blue-600 hover:bg-gray-50 hover:text-blue-800"
+	                  >
+	                    查看
+	                  </Link>
                 </div>
               </li>
             ))}
@@ -130,13 +140,13 @@ export function StocksPage() {
                         {stock.ts_code}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
-                      <Link
-                        to={`/stocks/${encodeURIComponent(stock.ts_code)}`}
-                        className="text-blue-600 hover:text-blue-800"
-                        onMouseEnter={() => {
-                          void preloadStockDetailPage();
-                          void queryClient.prefetchQuery({
+	                    <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
+	                      <Link
+	                        to={`/stocks/${encodeURIComponent(stock.ts_code)}${stockDetailQuery}`}
+	                        className="text-blue-600 hover:text-blue-800"
+	                        onMouseEnter={() => {
+	                          void preloadStockDetailPage();
+	                          void queryClient.prefetchQuery({
                             queryKey: ['stock-daily', stock.ts_code],
                             queryFn: () => api.getStockDaily(stock.ts_code, { limit: 250 }),
                           });
