@@ -5,6 +5,8 @@ import {
   useUpdateWaitJob,
   useCancelUpdateWaitJob,
   useStatus,
+  useAutoUpdateConfig,
+  useUpdateAutoUpdateConfig,
   useAvailability,
   useHealth,
 } from '../hooks/useApi';
@@ -17,6 +19,7 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
+  Save,
 } from 'lucide-react';
 
 export function UpdatePage() {
@@ -29,6 +32,23 @@ export function UpdatePage() {
   const updateMutation = useUpdate();
   const updateWaitMutation = useUpdateWait();
   const cancelWaitJobMutation = useCancelUpdateWaitJob();
+
+  const autoUpdateConfigQuery = useAutoUpdateConfig(isAdmin);
+  const updateAutoUpdateConfigMutation = useUpdateAutoUpdateConfig();
+  const [autoEnabledDraft, setAutoEnabledDraft] = useState<boolean | null>(null);
+  const [autoIntervalMinutesDraft, setAutoIntervalMinutesDraft] = useState<number | null>(null);
+  const [autoProviderDraft, setAutoProviderDraft] = useState<'baostock' | 'tushare' | null>(null);
+  const [autoRepairDaysDraft, setAutoRepairDaysDraft] = useState<number | null>(null);
+  const [autoSavedAt, setAutoSavedAt] = useState<number | null>(null);
+
+  const autoEnabled = autoEnabledDraft ?? autoUpdateConfigQuery.data?.enabled ?? false;
+  const autoIntervalMinutes =
+    autoIntervalMinutesDraft ??
+    (autoUpdateConfigQuery.data
+      ? Math.max(1, Math.round(autoUpdateConfigQuery.data.interval_seconds / 60))
+      : 10);
+  const autoProvider = autoProviderDraft ?? autoUpdateConfigQuery.data?.provider ?? 'baostock';
+  const autoRepairDays = autoRepairDaysDraft ?? autoUpdateConfigQuery.data?.repair_days ?? 30;
 
   const [mode, setMode] = useState<'normal' | 'wait'>('normal');
   const [waitJobId, setWaitJobId] = useState<string | null>(null);
@@ -84,6 +104,27 @@ export function UpdatePage() {
         },
       });
     }
+  };
+
+  const handleSaveAutoUpdateConfig = () => {
+    const interval_seconds = Math.max(1, Math.max(1, Math.round(autoIntervalMinutes)) * 60);
+    updateAutoUpdateConfigMutation.mutate(
+      {
+        enabled: autoEnabled,
+        interval_seconds,
+        provider: autoProvider,
+        repair_days: Math.max(0, Math.round(autoRepairDays)),
+      },
+      {
+        onSuccess: () => {
+          setAutoEnabledDraft(null);
+          setAutoProviderDraft(null);
+          setAutoRepairDaysDraft(null);
+          setAutoIntervalMinutesDraft(null);
+          setAutoSavedAt(Date.now());
+        },
+      }
+    );
   };
 
   const isPending =
@@ -149,6 +190,111 @@ export function UpdatePage() {
 
       {/* Update Form */}
       {isAdmin && (
+        <>
+          <div className="rounded-lg bg-white p-6 shadow">
+            <h2 className="mb-4 text-lg font-semibold text-gray-900">自动更新设置</h2>
+
+            {(autoUpdateConfigQuery.isLoading || autoUpdateConfigQuery.isFetching) && (
+              <div className="mb-4 flex items-center gap-2 text-sm text-gray-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                加载中...
+              </div>
+            )}
+
+            {autoUpdateConfigQuery.error && (
+              <div className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                读取自动更新配置失败：{(autoUpdateConfigQuery.error as Error).message}
+              </div>
+            )}
+
+            {updateAutoUpdateConfigMutation.error && (
+              <div className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                保存自动更新配置失败：{(updateAutoUpdateConfigMutation.error as Error).message}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">启用</label>
+                <label className="mt-2 flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={autoEnabled}
+                    onChange={(e) => setAutoEnabledDraft(e.target.checked)}
+                    disabled={!autoUpdateConfigQuery.data || updateAutoUpdateConfigMutation.isPending}
+                    className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
+                  />
+                  自动更新
+                </label>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">更新频率（分钟）</label>
+                <input
+                  type="number"
+                  value={autoIntervalMinutes}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    setAutoIntervalMinutesDraft(Number.isNaN(v) ? 10 : Math.max(1, v));
+                  }}
+                  disabled={!autoUpdateConfigQuery.data || updateAutoUpdateConfigMutation.isPending}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                />
+                <div className="mt-1 text-xs text-gray-500">默认 10 分钟</div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">数据提供商</label>
+                <select
+                  value={autoProvider}
+                  onChange={(e) => setAutoProviderDraft(e.target.value as 'baostock' | 'tushare')}
+                  disabled={!autoUpdateConfigQuery.data || updateAutoUpdateConfigMutation.isPending}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                >
+                  <option value="baostock">BaoStock（免费）</option>
+                  <option value="tushare">TuShare（需要 Token）</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">修复回溯（天）</label>
+                <input
+                  type="number"
+                  value={autoRepairDays}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    setAutoRepairDaysDraft(Number.isNaN(v) ? 30 : Math.max(0, v));
+                  }}
+                  disabled={!autoUpdateConfigQuery.data || updateAutoUpdateConfigMutation.isPending}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                />
+                <div className="mt-1 text-xs text-gray-500">默认 30 天</div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={handleSaveAutoUpdateConfig}
+                disabled={!autoUpdateConfigQuery.data || updateAutoUpdateConfigMutation.isPending}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[color:var(--sf-primary-600)] px-4 py-2 text-white hover:bg-[color:var(--sf-primary-700)] disabled:bg-[color:var(--sf-primary-400)] sm:w-auto"
+              >
+                {updateAutoUpdateConfigMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                保存配置
+              </button>
+            </div>
+
+            {autoSavedAt && (
+              <div className="mt-3 text-xs text-green-700">
+                已保存（{new Date(autoSavedAt).toLocaleString()}）
+              </div>
+            )}
+          </div>
+
         <div className="rounded-lg bg-white p-6 shadow">
           <div className="mb-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
@@ -341,6 +487,7 @@ export function UpdatePage() {
             )}
           </div>
         </div>
+        </>
       )}
 
       {/* Check Availability */}

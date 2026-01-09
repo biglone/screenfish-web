@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../api/client';
 import type {
+  AutoUpdateConfig,
   UpdateRequest,
   UpdateWaitRequest,
   UpdateWaitResponse,
@@ -11,6 +12,7 @@ import type {
 export const queryKeys = {
   health: ['health'] as const,
   status: ['status'] as const,
+  autoUpdateConfig: ['autoUpdateConfig'] as const,
   screen: (params: ScreenRequest) => ['screen', params] as const,
   availability: (date: string, provider: string) => ['availability', date, provider] as const,
   updateWaitJob: (jobId: string) => ['updateWaitJob', jobId] as const,
@@ -52,6 +54,25 @@ export function useUpdateWait() {
     mutationFn: (request: UpdateWaitRequest) => api.updateWait(request),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.status });
+    },
+  });
+}
+
+export function useAutoUpdateConfig(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.autoUpdateConfig,
+    queryFn: () => api.getAutoUpdateConfig(),
+    enabled,
+    retry: false,
+  });
+}
+
+export function useUpdateAutoUpdateConfig() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request: AutoUpdateConfig) => api.updateAutoUpdateConfig(request),
+    onSuccess: (data) => {
+      queryClient.setQueryData(queryKeys.autoUpdateConfig, data);
     },
   });
 }

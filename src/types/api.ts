@@ -47,6 +47,13 @@ export interface UpdateWaitResponse {
   last_error: string | null;
 }
 
+export interface AutoUpdateConfig {
+  enabled: boolean;
+  interval_seconds: number;
+  provider: 'baostock' | 'tushare';
+  repair_days: number;
+}
+
 export interface ScreenRequest {
   date?: string;
   combo?: 'and' | 'or';

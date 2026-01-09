@@ -5,6 +5,7 @@ import type {
   UpdateResponse,
   UpdateWaitRequest,
   UpdateWaitResponse,
+  AutoUpdateConfig,
   ScreenRequest,
   ScreenResponse,
   AvailabilityResponse,
@@ -184,6 +185,16 @@ class StockScreenerApi {
 
   async updateWait(request: UpdateWaitRequest): Promise<UpdateWaitResponse> {
     const { data } = await this.client.post<UpdateWaitResponse>('/v1/update/wait', request);
+    return data;
+  }
+
+  async getAutoUpdateConfig(): Promise<AutoUpdateConfig> {
+    const { data } = await this.client.get<AutoUpdateConfig>('/auto-update-config');
+    return data;
+  }
+
+  async updateAutoUpdateConfig(request: AutoUpdateConfig): Promise<AutoUpdateConfig> {
+    const { data } = await this.client.put<AutoUpdateConfig>('/auto-update-config', request);
     return data;
   }
 
