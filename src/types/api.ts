@@ -124,6 +124,23 @@ export interface AuthEmailRegisterRequest {
   password: string;
 }
 
+export interface AccountResponse {
+  id: string;
+  username: string;
+  email?: string | null;
+  role: 'admin' | 'user';
+}
+
+export interface AccountUpdateRequest {
+  email: string | null;
+  current_password: string;
+}
+
+export interface AccountChangePasswordRequest {
+  current_password: string;
+  new_password: string;
+}
+
 export interface AdminUserItem {
   id: string;
   username: string;

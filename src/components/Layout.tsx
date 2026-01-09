@@ -10,6 +10,7 @@ import {
   Star,
   Terminal,
   Users,
+  User,
   Menu,
   X,
   Palette,
@@ -24,10 +25,12 @@ const navItems: Array<{
   icon: typeof LayoutDashboard;
   label: string;
   adminOnly?: boolean;
+  authOnly?: boolean;
 }> = [
   { to: '/', icon: LayoutDashboard, label: '仪表盘' },
   { to: '/stocks', icon: List, label: '股票列表' },
   { to: '/watchlist', icon: Star, label: '自选分组' },
+  { to: '/account', icon: User, label: '账号设置', authOnly: true },
   { to: '/formulas', icon: FileCode, label: '公式管理' },
   { to: '/screen', icon: Search, label: '股票筛选' },
   { to: '/users', icon: Users, label: '用户管理', adminOnly: true },
@@ -45,7 +48,9 @@ export function Layout() {
   const isAdmin = !authEnabled || me.data?.role === 'admin';
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  const visibleItems = navItems.filter((item) => !item.adminOnly || isAdmin);
+  const visibleItems = navItems.filter(
+    (item) => (!item.adminOnly || isAdmin) && (!item.authOnly || authEnabled)
+  );
 
   const handleLogout = () => {
     logout(queryClient);

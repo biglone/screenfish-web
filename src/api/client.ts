@@ -17,6 +17,9 @@ import type {
   AuthRegisterRequest,
   AuthTokenResponse,
   AuthUserResponse,
+  AccountChangePasswordRequest,
+  AccountResponse,
+  AccountUpdateRequest,
   StockListResponse,
   StockDailyResponse,
   FormulaItem,
@@ -151,6 +154,21 @@ class StockScreenerApi {
 
   async me(): Promise<AuthUserResponse> {
     const { data } = await this.client.get<AuthUserResponse>('/v1/auth/me');
+    return data;
+  }
+
+  async account(): Promise<AccountResponse> {
+    const { data } = await this.client.get<AccountResponse>('/v1/account');
+    return data;
+  }
+
+  async updateAccount(request: AccountUpdateRequest): Promise<AccountResponse> {
+    const { data } = await this.client.put<AccountResponse>('/v1/account', request);
+    return data;
+  }
+
+  async changePassword(request: AccountChangePasswordRequest): Promise<AuthTokenResponse> {
+    const { data } = await this.client.post<AuthTokenResponse>('/v1/account/change-password', request);
     return data;
   }
 
