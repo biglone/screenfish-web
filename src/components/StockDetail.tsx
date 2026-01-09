@@ -124,6 +124,15 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
 
   const isPanel = variant === 'panel';
 
+  useEffect(() => {
+    // When switching to a different stock in the panel view, reset to sensible defaults.
+    setIndicatorSelection('auto');
+    setShowVolume(true);
+    setShowKdj(true);
+    setHoverData(null);
+    setModalData(null);
+  }, [tsCodeNormalized]);
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['stock-daily', tsCodeNormalized],
     queryFn: () => api.getStockDaily(tsCodeNormalized, { limit: 250 }),
