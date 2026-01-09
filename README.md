@@ -60,3 +60,26 @@ cd ~/workspace/screenfish-web
 ./scripts/screenfish-prod.sh status
 ./scripts/screenfish-prod.sh logs backend -f
 ```
+
+## 远程开发：一键部署 + 本地查看
+
+如果你是通过 SSH 在服务器上开发（服务器不方便开浏览器），推荐：
+
+1) 在服务器上部署到 `screenfish-prod`（会重启服务）：
+
+```bash
+cd ~/workspace/screenfish-web
+./scripts/prod-deploy.sh
+```
+
+2) 在你的电脑上端口转发并打开页面：
+
+```bash
+./scripts/prod-forward.sh <user>@<server> --open
+```
+
+停止转发：
+
+```bash
+./scripts/prod-forward.sh --stop
+```
