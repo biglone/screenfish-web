@@ -754,140 +754,143 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
       )}
 
       {/* Chart */}
-      {data && (
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white p-4">
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">K线图</h2>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-gray-500">周期</span>
-              <div className="inline-flex overflow-hidden rounded-md border border-gray-300 bg-white shadow-sm">
-                {(['D', 'M', 'Y'] as const).map((tf, idx) => (
-                  <button
-                    key={tf}
-                    type="button"
-                    onClick={() => setTimeframe(tf)}
-                    className={`h-9 px-3 text-sm ${
-                      timeframe === tf
-                        ? 'bg-blue-600 text-white'
-                        : 'text-gray-700 hover:bg-gray-50'
-                    } ${idx ? 'border-l border-gray-300' : ''}`}
-                  >
-                    {TIMEFRAME_LABEL[tf]}
-                  </button>
-                ))}
-              </div>
-              {dailyQuery.isFetchingNextPage && (
-                <span className="text-sm text-gray-400">历史加载中...</span>
-              )}
-
-              <span className="text-sm text-gray-500">指标</span>
-              <select
-                value={selectedIndicatorId ?? ''}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setIndicatorSelection(v ? Number(v) : 'none');
-                }}
-                disabled={!indicatorFormulasData?.formulas.length && !indicatorsLoading}
-                className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
-              >
-                <option value="">无</option>
-                {(indicatorFormulasData?.formulas ?? []).map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name}
-                    {f.timeframe ? ` (${f.timeframe})` : ''}
-                  </option>
-                ))}
-              </select>
-              {indicatorSeriesLoading && (
-                <span className="text-sm text-gray-400">加载中...</span>
-              )}
-              {indicatorSeriesError && selectedIndicatorId !== null && (
-                <span className="text-sm text-red-600">
-                  {indicatorSeriesError instanceof Error
-                    ? indicatorSeriesError.message
-                    : '指标加载失败'}
-                </span>
-              )}
-              {!indicatorsLoading && (indicatorFormulasData?.formulas.length ?? 0) === 0 && (
-                <Link to="/formulas" className="text-sm text-gray-500 hover:text-gray-700">
-                  去创建指标公式
-                </Link>
-              )}
-
-              <span className="ml-2 text-sm text-gray-500">附图</span>
-              <label className="inline-flex items-center gap-1 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={showVolume}
-                  onChange={(e) => setShowVolume(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                成交量
-              </label>
-              <label className="inline-flex items-center gap-1 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={showKdj}
-                  onChange={(e) => setShowKdj(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                KDJ
-              </label>
+      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white p-4">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-lg font-semibold text-gray-900">K线图</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm text-gray-500">周期</span>
+            <div className="inline-flex overflow-hidden rounded-md border border-gray-300 bg-white shadow-sm">
+              {(['D', 'M', 'Y'] as const).map((tf, idx) => (
+                <button
+                  key={tf}
+                  type="button"
+                  onClick={() => setTimeframe(tf)}
+                  className={`h-9 px-3 text-sm ${
+                    timeframe === tf ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
+                  } ${idx ? 'border-l border-gray-300' : ''}`}
+                >
+                  {TIMEFRAME_LABEL[tf]}
+                </button>
+              ))}
             </div>
-          </div>
-          <div ref={chartContainerRef} className="relative w-full">
-            {/* Hover Tooltip */}
-            {hoverData && (
-              <div
-                className="pointer-events-none absolute z-10 rounded-lg border border-gray-200 bg-white p-3 shadow-lg"
-                style={{ left: hoverData.x, top: hoverData.y, minWidth: 180 }}
-              >
-                {(() => {
-                  const { bar, prevBar } = hoverData;
-                  const { change, changePercent, isUp } = calcChange(bar, prevBar);
-                  return (
-                    <div className="space-y-1 text-sm">
-                      <div className="font-medium text-gray-900">
-                        {formatDate(bar.trade_date)}
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">收盘</span>
-                        <span className={isUp ? 'text-red-600' : 'text-green-600'}>
-                          {bar.close.toFixed(2)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">涨跌</span>
-                        <span className={isUp ? 'text-red-600' : 'text-green-600'}>
-                          {isUp ? '+' : ''}
-                          {change.toFixed(2)} ({isUp ? '+' : ''}
-                          {changePercent.toFixed(2)}%)
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">开盘</span>
-                        <span>{bar.open.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">最高</span>
-                        <span className="text-red-600">{bar.high.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">最低</span>
-                        <span className="text-green-600">{bar.low.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">成交量</span>
-                        <span>{(bar.vol / 10000).toFixed(2)}万</span>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
+            {dailyQuery.isFetchingNextPage && (
+              <span className="text-sm text-gray-400">历史加载中...</span>
             )}
+
+            <span className="text-sm text-gray-500">指标</span>
+            <select
+              value={selectedIndicatorId ?? ''}
+              onChange={(e) => {
+                const v = e.target.value;
+                setIndicatorSelection(v ? Number(v) : 'none');
+              }}
+              disabled={!indicatorFormulasData?.formulas.length && !indicatorsLoading}
+              className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+            >
+              <option value="">无</option>
+              {(indicatorFormulasData?.formulas ?? []).map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                  {f.timeframe ? ` (${f.timeframe})` : ''}
+                </option>
+              ))}
+            </select>
+            {indicatorSeriesLoading && <span className="text-sm text-gray-400">加载中...</span>}
+            {indicatorSeriesError && selectedIndicatorId !== null && (
+              <span className="text-sm text-red-600">
+                {indicatorSeriesError instanceof Error
+                  ? indicatorSeriesError.message
+                  : '指标加载失败'}
+              </span>
+            )}
+            {!indicatorsLoading && (indicatorFormulasData?.formulas.length ?? 0) === 0 && (
+              <Link to="/formulas" className="text-sm text-gray-500 hover:text-gray-700">
+                去创建指标公式
+              </Link>
+            )}
+
+            <span className="ml-2 text-sm text-gray-500">附图</span>
+            <label className="inline-flex items-center gap-1 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={showVolume}
+                onChange={(e) => setShowVolume(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              成交量
+            </label>
+            <label className="inline-flex items-center gap-1 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={showKdj}
+                onChange={(e) => setShowKdj(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              KDJ
+            </label>
           </div>
         </div>
-      )}
+        <div ref={chartContainerRef} className="relative w-full" style={{ height: CHART_HEIGHT }}>
+          {dailyQuery.isFetching && displayBars.length === 0 && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+            </div>
+          )}
+          {!dailyQuery.isFetching && displayBars.length === 0 && !error && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center text-sm text-gray-400">
+              暂无数据
+            </div>
+          )}
+
+          {/* Hover Tooltip */}
+          {hoverData && (
+            <div
+              className="pointer-events-none absolute z-20 rounded-lg border border-gray-200 bg-white p-3 shadow-lg"
+              style={{ left: hoverData.x, top: hoverData.y, minWidth: 180 }}
+            >
+              {(() => {
+                const { bar, prevBar } = hoverData;
+                const { change, changePercent, isUp } = calcChange(bar, prevBar);
+                return (
+                  <div className="space-y-1 text-sm">
+                    <div className="font-medium text-gray-900">{formatDate(bar.trade_date)}</div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">收盘</span>
+                      <span className={isUp ? 'text-red-600' : 'text-green-600'}>
+                        {bar.close.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">涨跌</span>
+                      <span className={isUp ? 'text-red-600' : 'text-green-600'}>
+                        {isUp ? '+' : ''}
+                        {change.toFixed(2)} ({isUp ? '+' : ''}
+                        {changePercent.toFixed(2)}%)
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">开盘</span>
+                      <span>{bar.open.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">最高</span>
+                      <span className="text-red-600">{bar.high.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">最低</span>
+                      <span className="text-green-600">{bar.low.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">成交量</span>
+                      <span>{(bar.vol / 10000).toFixed(2)}万</span>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Detail Modal */}
       {modalData && (
