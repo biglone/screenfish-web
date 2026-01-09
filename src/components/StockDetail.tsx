@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { ArrowLeft, ExternalLink, X } from 'lucide-react';
 import {
   CandlestickSeries,
@@ -10,15 +10,32 @@ import {
   type CandlestickData,
   type IChartApi,
   type ISeriesApi,
+  type LogicalRange,
   type LineData,
   type Time,
   type WhitespaceData,
 } from 'lightweight-charts';
 import api from '../api/client';
-import type { DailyBar } from '../types/api';
+import type { DailyBar, IndicatorPoint } from '../types/api';
 
 const CHART_HEIGHT = 500;
 const SUB_PANE_HEIGHT = 0.2;
+const MAX_DAILY_BARS = 20000;
+const DAILY_PAGE_SIZE = 1200;
+
+type KlineTimeframe = 'D' | 'M' | 'Y';
+
+const TIMEFRAME_LABEL: Record<KlineTimeframe, string> = {
+  D: '日线',
+  M: '月线',
+  Y: '年线',
+};
+
+const DEFAULT_VISIBLE_BARS: Record<KlineTimeframe, number> = {
+  D: 250,
+  M: 60,
+  Y: 20,
+};
 
 interface HoverData {
   bar: DailyBar;
@@ -46,6 +63,67 @@ function formatDate(yyyymmdd: string) {
 
 function toIsoDate(yyyymmdd: string): Time {
   return `${yyyymmdd.slice(0, 4)}-${yyyymmdd.slice(4, 6)}-${yyyymmdd.slice(6, 8)}` as Time;
+}
+
+function prevYyyymmdd(yyyymmdd: string): string {
+  if (yyyymmdd.length !== 8) return yyyymmdd;
+  const y = Number(yyyymmdd.slice(0, 4));
+  const m = Number(yyyymmdd.slice(4, 6)) - 1;
+  const d = Number(yyyymmdd.slice(6, 8));
+  const dt = new Date(Date.UTC(y, m, d));
+  if (Number.isNaN(dt.getTime())) return yyyymmdd;
+  dt.setUTCDate(dt.getUTCDate() - 1);
+  const yy = String(dt.getUTCFullYear()).padStart(4, '0');
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getUTCDate()).padStart(2, '0');
+  return `${yy}${mm}${dd}`;
+}
+
+function aggregateBars(bars: DailyBar[], timeframe: KlineTimeframe): DailyBar[] {
+  if (timeframe === 'D') return bars;
+  const out: DailyBar[] = [];
+  let currentKey: string | null = null;
+  let agg: DailyBar | null = null;
+
+  for (const bar of bars) {
+    const key = timeframe === 'M' ? bar.trade_date.slice(0, 6) : bar.trade_date.slice(0, 4);
+    if (currentKey !== key) {
+      if (agg) out.push(agg);
+      currentKey = key;
+      agg = { ...bar };
+      continue;
+    }
+    if (!agg) {
+      agg = { ...bar };
+      continue;
+    }
+    agg.high = Math.max(agg.high, bar.high);
+    agg.low = Math.min(agg.low, bar.low);
+    agg.close = bar.close;
+    agg.vol += bar.vol;
+    agg.amount += bar.amount;
+    agg.trade_date = bar.trade_date;
+  }
+
+  if (agg) out.push(agg);
+  return out;
+}
+
+function buildIndicatorLineData(
+  bars: DailyBar[],
+  points: IndicatorPoint[]
+): Array<LineData<Time> | WhitespaceData<Time>> {
+  const valueByDate = new Map<string, number | null>();
+  for (const p of points) {
+    valueByDate.set(p.trade_date, p.value);
+  }
+
+  return bars.map((bar) => {
+    const v = valueByDate.get(bar.trade_date);
+    return v === null || v === undefined
+      ? { time: toIsoDate(bar.trade_date) }
+      : { time: toIsoDate(bar.trade_date), value: v };
+  });
 }
 
 function sma(values: Array<number | null>, n: number, m: number): Array<number | null> {
@@ -108,12 +186,14 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
   const tsCodeNormalized = tsCode.trim();
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
+  const candlestickSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const indicatorLineSeriesRefs = useRef<Array<ISeriesApi<'Line'>>>([]);
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const kdjLineSeriesRefs = useRef<Array<ISeriesApi<'Line'>>>([]);
   const [hoverData, setHoverData] = useState<HoverData | null>(null);
   const [modalData, setModalData] = useState<ModalData | null>(null);
   const [indicatorSelection, setIndicatorSelection] = useState<number | 'auto' | 'none'>('auto');
+  const [timeframe, setTimeframe] = useState<KlineTimeframe>('D');
   const [showVolume, setShowVolume] = useState(true);
   const [showKdj, setShowKdj] = useState(true);
   const mainAreaRatioRef = useRef<number>(
@@ -127,17 +207,54 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
   useEffect(() => {
     // When switching to a different stock in the panel view, reset to sensible defaults.
     setIndicatorSelection('auto');
+    setTimeframe('D');
     setShowVolume(true);
     setShowKdj(true);
     setHoverData(null);
     setModalData(null);
   }, [tsCodeNormalized]);
 
-  const { data, isLoading, error } = useQuery({
+  const dailyQuery = useInfiniteQuery({
     queryKey: ['stock-daily', tsCodeNormalized],
-    queryFn: () => api.getStockDaily(tsCodeNormalized, { limit: 250 }),
+    queryFn: ({ pageParam }: { pageParam: string | undefined }) =>
+      api.getStockDaily(tsCodeNormalized, { end: pageParam, limit: DAILY_PAGE_SIZE }),
+    initialPageParam: undefined,
+    getNextPageParam: (lastPage, allPages) => {
+      const total = allPages.reduce((acc, p) => acc + p.bars.length, 0);
+      if (total >= MAX_DAILY_BARS) return undefined;
+      if (lastPage.bars.length < DAILY_PAGE_SIZE) return undefined;
+      let earliest: string | undefined;
+      for (const page of allPages) {
+        const first = page.bars[0]?.trade_date;
+        if (!first) continue;
+        if (!earliest || first < earliest) earliest = first;
+      }
+      return earliest ? prevYyyymmdd(earliest) : undefined;
+    },
     enabled: !!tsCodeNormalized,
   });
+
+  const dailyData = dailyQuery.data?.pages[0] ?? null;
+  const dailyBars = useMemo(() => {
+    const pages = dailyQuery.data?.pages ?? [];
+    const map = new Map<string, DailyBar>();
+    for (const page of pages) {
+      for (const bar of page.bars) {
+        map.set(bar.trade_date, bar);
+      }
+    }
+    const out = Array.from(map.values());
+    out.sort((a, b) => a.trade_date.localeCompare(b.trade_date));
+    return out;
+  }, [dailyQuery.data]);
+
+  const displayBars = useMemo(() => {
+    return aggregateBars(dailyBars, timeframe);
+  }, [dailyBars, timeframe]);
+
+  const data = dailyData;
+  const isLoading = dailyQuery.isLoading;
+  const error = dailyQuery.error;
 
   const { data: indicatorFormulasData, isLoading: indicatorsLoading } = useQuery({
     queryKey: ['formulas', 'indicator', 'enabled'],
@@ -155,14 +272,21 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
         ? null
         : defaultIndicatorId;
 
+  const indicatorLimit = useMemo(() => {
+    const base = Math.max(DAILY_PAGE_SIZE, dailyBars.length);
+    return Math.min(MAX_DAILY_BARS, base);
+  }, [dailyBars.length]);
+
   const {
     data: indicatorSeriesData,
     isLoading: indicatorSeriesLoading,
     error: indicatorSeriesError,
   } = useQuery({
-    queryKey: ['indicator-series', tsCodeNormalized, selectedIndicatorId],
-    queryFn: () => api.getIndicatorSeries(tsCodeNormalized, selectedIndicatorId!, { limit: 250 }),
-    enabled: !!tsCodeNormalized && selectedIndicatorId !== null,
+    queryKey: ['indicator-series', tsCodeNormalized, selectedIndicatorId, indicatorLimit],
+    queryFn: () =>
+      api.getIndicatorSeries(tsCodeNormalized, selectedIndicatorId!, { limit: indicatorLimit }),
+    enabled: !!tsCodeNormalized && selectedIndicatorId !== null && indicatorLimit > 0,
+    placeholderData: keepPreviousData,
   });
 
   // Build a map for quick lookup
@@ -227,21 +351,16 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
     lastClickTime.current = now;
   }, []);
 
+  const fetchMoreInFlightRef = useRef(false);
   useEffect(() => {
-    if (!chartContainerRef.current || !data?.bars.length) return;
-
-    // Build bars map
-    barsMap.current.clear();
-    barsArrayRef.current = data.bars;
-    data.bars.forEach((bar, index) => {
-      barsMap.current.set(bar.trade_date, { bar, index });
-    });
-
-    // Clean up existing chart
-    if (chartRef.current) {
-      chartRef.current.remove();
-      chartRef.current = null;
+    if (!dailyQuery.isFetchingNextPage) {
+      fetchMoreInFlightRef.current = false;
     }
+  }, [dailyQuery.isFetchingNextPage]);
+
+  useEffect(() => {
+    if (!chartContainerRef.current) return;
+    if (chartRef.current) return;
 
     // Create chart
     const width = chartContainerRef.current.clientWidth || 600;
@@ -283,26 +402,13 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
       wickDownColor: '#22c55e',
       wickUpColor: '#ef4444',
     });
-
-    // Convert data to chart format
-    const chartData: CandlestickData<Time>[] = data.bars.map((bar) => ({
-      time: toIsoDate(bar.trade_date),
-      open: bar.open,
-      high: bar.high,
-      low: bar.low,
-      close: bar.close,
-    }));
-
-    candlestickSeries.setData(chartData);
+    candlestickSeriesRef.current = candlestickSeries;
 
     // Subscribe to crosshair move for hover tooltip
     chart.subscribeCrosshairMove(handleCrosshairMove);
 
     // Subscribe to click for double-click detection
     chart.subscribeClick(handleChartClick);
-
-    // Fit content
-    chart.timeScale().fitContent();
 
     // Handle resize
     const handleResize = () => {
@@ -323,15 +429,94 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
         chartRef.current.remove();
         chartRef.current = null;
       }
+      candlestickSeriesRef.current = null;
       indicatorLineSeriesRefs.current = [];
       volumeSeriesRef.current = null;
       kdjLineSeriesRefs.current = [];
     };
-  }, [data, handleCrosshairMove, handleChartClick]);
+  }, [handleCrosshairMove, handleChartClick]);
+
+  const appliedInitialViewKeyRef = useRef<string>('');
+  useEffect(() => {
+    const chart = chartRef.current;
+    const candlestickSeries = candlestickSeriesRef.current;
+    if (!chart || !candlestickSeries) return;
+
+    const viewKey = `${tsCodeNormalized}:${timeframe}`;
+    const hasInitialView = appliedInitialViewKeyRef.current === viewKey;
+    const prevVisibleRange = hasInitialView ? chart.timeScale().getVisibleRange() : null;
+
+    // Build bars map
+    barsMap.current.clear();
+    barsArrayRef.current = displayBars;
+    displayBars.forEach((bar, index) => {
+      barsMap.current.set(bar.trade_date, { bar, index });
+    });
+
+    // Convert data to chart format
+    const chartData: CandlestickData<Time>[] = displayBars.map((bar) => ({
+      time: toIsoDate(bar.trade_date),
+      open: bar.open,
+      high: bar.high,
+      low: bar.low,
+      close: bar.close,
+    }));
+
+    candlestickSeries.setData(chartData);
+
+    if (hasInitialView && prevVisibleRange) {
+      chart.timeScale().setVisibleRange(prevVisibleRange);
+      return;
+    }
+
+    if (displayBars.length > 0) {
+      const to = displayBars.length;
+      const from = Math.max(0, to - DEFAULT_VISIBLE_BARS[timeframe]);
+      chart.timeScale().setVisibleLogicalRange({ from, to });
+      appliedInitialViewKeyRef.current = viewKey;
+    }
+  }, [displayBars, timeframe, tsCodeNormalized]);
 
   useEffect(() => {
     const chart = chartRef.current;
-    if (!chart || !data?.bars.length) return;
+    if (!chart) return;
+
+    const threshold = timeframe === 'D' ? 50 : timeframe === 'M' ? 10 : 5;
+
+    const onVisibleRangeChange = (range: LogicalRange | null) => {
+      if (!range) return;
+      if (!dailyQuery.hasNextPage) return;
+      if (dailyQuery.isFetchingNextPage) return;
+      if (fetchMoreInFlightRef.current) return;
+      if (range.from > threshold) return;
+
+      fetchMoreInFlightRef.current = true;
+      void dailyQuery.fetchNextPage().finally(() => {
+        fetchMoreInFlightRef.current = false;
+      });
+    };
+
+    chart.timeScale().subscribeVisibleLogicalRangeChange(onVisibleRangeChange);
+    return () => {
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange(onVisibleRangeChange);
+    };
+  }, [dailyQuery.fetchNextPage, dailyQuery.hasNextPage, dailyQuery.isFetchingNextPage, timeframe]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+
+    if (displayBars.length === 0) {
+      if (volumeSeriesRef.current) {
+        chart.removeSeries(volumeSeriesRef.current);
+        volumeSeriesRef.current = null;
+      }
+      for (const s of kdjLineSeriesRefs.current) {
+        chart.removeSeries(s);
+      }
+      kdjLineSeriesRefs.current = [];
+      return;
+    }
 
     const subPaneCount = (showVolume ? 1 : 0) + (showKdj ? 1 : 0);
     const mainAreaRatio = 1 - subPaneCount * SUB_PANE_HEIGHT;
@@ -369,7 +554,7 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
             bottom: showKdj ? SUB_PANE_HEIGHT : 0,
           },
         });
-        const volumeData = data.bars.map((bar) => ({
+        const volumeData = displayBars.map((bar) => ({
           time: toIsoDate(bar.trade_date),
           value: bar.vol,
           color: bar.close >= bar.open ? '#ef4444' : '#22c55e',
@@ -413,12 +598,12 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
             bottom: 0,
           },
         });
-        const { k, d, j } = calcKdj(data.bars);
+        const { k, d, j } = calcKdj(displayBars);
         const linePoints = [k, d, j].map((arr) =>
           arr.map((v, i) =>
             v === null
-              ? { time: toIsoDate(data.bars[i].trade_date) }
-              : { time: toIsoDate(data.bars[i].trade_date), value: v }
+              ? { time: toIsoDate(displayBars[i].trade_date) }
+              : { time: toIsoDate(displayBars[i].trade_date), value: v }
           )
         );
 
@@ -427,7 +612,7 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
         }
       }
     }
-  }, [data, showKdj, showVolume]);
+  }, [displayBars, showKdj, showVolume]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -439,6 +624,11 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
       }
       indicatorLineSeriesRefs.current = [];
     };
+
+    if (displayBars.length === 0) {
+      clearIndicatorLines();
+      return;
+    }
 
     if (
       selectedIndicatorId === null ||
@@ -465,16 +655,12 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
         priceLineVisible: false,
       });
 
-      const lineData: Array<LineData<Time> | WhitespaceData<Time>> = line.points.map((p) =>
-        p.value === null
-          ? { time: toIsoDate(p.trade_date) }
-          : { time: toIsoDate(p.trade_date), value: p.value }
-      );
+      const lineData = buildIndicatorLineData(displayBars, line.points);
 
       s.setData(lineData);
       indicatorLineSeriesRefs.current.push(s);
     }
-  }, [data, indicatorSeriesData, selectedIndicatorId]);
+  }, [displayBars, indicatorSeriesData, selectedIndicatorId]);
 
   if (!tsCodeNormalized) {
     return <div className="p-4 text-red-500">Invalid stock code</div>;
@@ -542,7 +728,12 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
           </h1>
           {data && (
             <p className="mt-1 text-sm text-gray-500">
-              共 {data.bars.length} 条日线数据 · 双击K线查看详情
+              已加载 {dailyBars.length} 条日线数据 · {TIMEFRAME_LABEL[timeframe]} {displayBars.length} 根 · 双击K线查看详情
+              {dailyQuery.isFetchingNextPage
+                ? ' · 历史数据加载中...'
+                : dailyQuery.hasNextPage
+                  ? ' · 向左滚动/缩放可继续加载'
+                  : ''}
             </p>
           )}
         </div>
@@ -568,6 +759,27 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-lg font-semibold text-gray-900">K线图</h2>
             <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-gray-500">周期</span>
+              <div className="inline-flex overflow-hidden rounded-md border border-gray-300 bg-white shadow-sm">
+                {(['D', 'M', 'Y'] as const).map((tf, idx) => (
+                  <button
+                    key={tf}
+                    type="button"
+                    onClick={() => setTimeframe(tf)}
+                    className={`h-9 px-3 text-sm ${
+                      timeframe === tf
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    } ${idx ? 'border-l border-gray-300' : ''}`}
+                  >
+                    {TIMEFRAME_LABEL[tf]}
+                  </button>
+                ))}
+              </div>
+              {dailyQuery.isFetchingNextPage && (
+                <span className="text-sm text-gray-400">历史加载中...</span>
+              )}
+
               <span className="text-sm text-gray-500">指标</span>
               <select
                 value={selectedIndicatorId ?? ''}
@@ -780,15 +992,15 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
       )}
 
       {/* Latest Data */}
-      {data && data.bars.length > 0 && (
+      {dailyBars.length > 0 && (
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
           <div className="border-b border-gray-200 bg-gray-50 px-6 py-3">
             <h2 className="text-lg font-semibold text-gray-900">最新行情</h2>
           </div>
           <div className="grid grid-cols-2 gap-4 p-6 md:grid-cols-4">
             {(() => {
-              const latest = data.bars[data.bars.length - 1];
-              const prev = data.bars.length > 1 ? data.bars[data.bars.length - 2] : null;
+              const latest = dailyBars[dailyBars.length - 1];
+              const prev = dailyBars.length > 1 ? dailyBars[dailyBars.length - 2] : null;
               const { change, changePercent, isUp } = calcChange(latest, prev);
 
               return (

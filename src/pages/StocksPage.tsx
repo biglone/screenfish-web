@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import api from '../api/client';
@@ -12,7 +12,6 @@ export function StocksPage() {
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [page, setPage] = useState(0);
-  const queryClient = useQueryClient();
 
   const stockDetailQuery = useMemo(() => {
     const params = new URLSearchParams();
@@ -141,17 +140,13 @@ export function StocksPage() {
                       </span>
                     </td>
 	                    <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
-	                      <Link
+	                    <Link
 	                        to={`/stocks/${encodeURIComponent(stock.ts_code)}${stockDetailQuery}`}
 	                        className="text-blue-600 hover:text-blue-800"
 	                        onMouseEnter={() => {
 	                          void preloadStockDetailPage();
-	                          void queryClient.prefetchQuery({
-                            queryKey: ['stock-daily', stock.ts_code],
-                            queryFn: () => api.getStockDaily(stock.ts_code, { limit: 250 }),
-                          });
-                        }}
-                      >
+	                        }}
+	                      >
                         查看详情
                       </Link>
                     </td>
