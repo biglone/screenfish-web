@@ -763,7 +763,7 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
       {/* Loading */}
       {isLoading && (
         <div className="flex justify-center py-8">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[color:var(--sf-primary-600)] border-t-transparent" />
         </div>
       )}
 
@@ -774,18 +774,20 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-gray-500">周期</span>
             <div className="inline-flex overflow-hidden rounded-md border border-gray-300 bg-white shadow-sm">
-              {(['D', 'M', 'Y'] as const).map((tf, idx) => (
-                <button
-                  key={tf}
-                  type="button"
-                  onClick={() => setTimeframe(tf)}
-                  className={`h-9 px-3 text-sm ${
-                    timeframe === tf ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-                  } ${idx ? 'border-l border-gray-300' : ''}`}
-                >
-                  {TIMEFRAME_LABEL[tf]}
-                </button>
-              ))}
+	              {(['D', 'M', 'Y'] as const).map((tf, idx) => (
+	                <button
+	                  key={tf}
+	                  type="button"
+	                  onClick={() => setTimeframe(tf)}
+	                  className={`h-9 px-3 text-sm ${
+	                    timeframe === tf
+	                      ? 'bg-[color:var(--sf-primary-600)] text-white'
+	                      : 'text-gray-700 hover:bg-gray-50'
+	                  } ${idx ? 'border-l border-gray-300' : ''}`}
+	                >
+	                  {TIMEFRAME_LABEL[tf]}
+	                </button>
+	              ))}
             </div>
             {dailyQuery.isFetchingNextPage && (
               <span className="text-sm text-gray-400">历史加载中...</span>
@@ -797,10 +799,10 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
               onChange={(e) => {
                 const v = e.target.value;
                 setIndicatorSelection(v ? Number(v) : 'none');
-              }}
-              disabled={!indicatorFormulasData?.formulas.length && !indicatorsLoading}
-              className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
-            >
+	              }}
+	              disabled={!indicatorFormulasData?.formulas.length && !indicatorsLoading}
+	              className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)] disabled:bg-gray-100"
+	            >
               <option value="">无</option>
               {(indicatorFormulasData?.formulas ?? []).map((f) => (
                 <option key={f.id} value={f.id}>
@@ -825,31 +827,31 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
 
             <span className="ml-2 text-sm text-gray-500">附图</span>
             <label className="inline-flex items-center gap-1 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={showVolume}
-                onChange={(e) => setShowVolume(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              成交量
-            </label>
+	                <input
+	                  type="checkbox"
+	                  checked={showVolume}
+	                  onChange={(e) => setShowVolume(e.target.checked)}
+	                  className="h-4 w-4 rounded border-gray-300 accent-[color:var(--sf-primary-600)] focus:ring-[color:var(--sf-primary-500)]"
+	                />
+	                成交量
+	              </label>
             <label className="inline-flex items-center gap-1 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={showKdj}
-                onChange={(e) => setShowKdj(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              KDJ
-            </label>
+	                <input
+	                  type="checkbox"
+	                  checked={showKdj}
+	                  onChange={(e) => setShowKdj(e.target.checked)}
+	                  className="h-4 w-4 rounded border-gray-300 accent-[color:var(--sf-primary-600)] focus:ring-[color:var(--sf-primary-500)]"
+	                />
+	                KDJ
+	              </label>
           </div>
         </div>
         <div ref={chartContainerRef} className="relative w-full" style={{ height: CHART_HEIGHT }}>
-          {dailyQuery.isFetching && displayBars.length === 0 && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
-            </div>
-          )}
+	          {dailyQuery.isFetching && displayBars.length === 0 && (
+	            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70">
+	              <div className="h-8 w-8 animate-spin rounded-full border-4 border-[color:var(--sf-primary-600)] border-t-transparent" />
+	            </div>
+	          )}
           {!dailyQuery.isFetching && displayBars.length === 0 && !error && (
             <div className="absolute inset-0 z-10 flex items-center justify-center text-sm text-gray-400">
               暂无数据

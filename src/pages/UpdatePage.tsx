@@ -100,7 +100,13 @@ export function UpdatePage() {
     if (!waitJob) return null;
     const status = waitJob.status;
     if (status === 'running') {
-      return { tone: 'info' as const, title: '任务运行中', icon: <Clock className="h-5 w-5 animate-pulse text-blue-600" /> };
+      return {
+        tone: 'info' as const,
+        title: '任务运行中',
+        icon: (
+          <Clock className="h-5 w-5 animate-pulse text-[color:var(--sf-primary-600)]" />
+        ),
+      };
     }
     if (status === 'succeeded') {
       return { tone: 'success' as const, title: '更新完成', icon: <CheckCircle className="h-5 w-5 text-green-600" /> };
@@ -127,12 +133,12 @@ export function UpdatePage() {
       )}
 
       {/* Current Status */}
-      <div className="rounded-lg bg-blue-50 p-4">
+      <div className="rounded-lg bg-[color:var(--sf-primary-50)] p-4">
         <div className="flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 text-blue-600" />
+          <AlertCircle className="h-5 w-5 text-[color:var(--sf-primary-600)]" />
           <div>
-            <p className="text-sm font-medium text-blue-800">当前数据状态</p>
-            <p className="text-sm text-blue-700">
+            <p className="text-sm font-medium text-[color:var(--sf-primary-800)]">当前数据状态</p>
+            <p className="text-sm text-[color:var(--sf-primary-700)]">
               最新数据日期: {formatDate(status?.max_daily_trade_date)} |
               股票数量: {status?.stocks?.toLocaleString() ?? '-'} |
               数据行数: {status?.rows?.toLocaleString() ?? '-'}
@@ -146,22 +152,22 @@ export function UpdatePage() {
         <div className="rounded-lg bg-white p-6 shadow">
           <div className="mb-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  checked={mode === 'normal'}
-                  onChange={() => setMode('normal')}
-                  className="h-4 w-4 text-blue-600"
-                />
+	              <label className="flex items-center">
+	                <input
+	                  type="radio"
+	                  checked={mode === 'normal'}
+	                  onChange={() => setMode('normal')}
+	                  className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
+	                />
                 <span className="ml-2 text-sm text-gray-700">普通更新</span>
               </label>
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  checked={mode === 'wait'}
-                  onChange={() => setMode('wait')}
-                  className="h-4 w-4 text-blue-600"
-                />
+	              <label className="flex items-center">
+	                <input
+	                  type="radio"
+	                  checked={mode === 'wait'}
+	                  onChange={() => setMode('wait')}
+	                  className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
+	                />
                 <span className="ml-2 text-sm text-gray-700">等待更新（轮询直到数据可用）</span>
               </label>
             </div>
@@ -172,18 +178,18 @@ export function UpdatePage() {
               <label className="block text-sm font-medium text-gray-700">
                 数据提供商
               </label>
-              <select
-                value={mode === 'normal' ? formData.provider : waitData.provider}
-                onChange={(e) => {
-                  const provider = e.target.value as 'baostock' | 'tushare';
-                  if (mode === 'normal') {
-                    setFormData({ ...formData, provider });
-                  } else {
-                    setWaitData({ ...waitData, provider });
-                  }
-                }}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              >
+	              <select
+	                value={mode === 'normal' ? formData.provider : waitData.provider}
+	                onChange={(e) => {
+	                  const provider = e.target.value as 'baostock' | 'tushare';
+	                  if (mode === 'normal') {
+	                    setFormData({ ...formData, provider });
+	                  } else {
+	                    setWaitData({ ...waitData, provider });
+	                  }
+	                }}
+	                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+	              >
                 <option value="baostock">BaoStock（免费）</option>
                 <option value="tushare">TuShare（需要 Token）</option>
               </select>
@@ -195,29 +201,29 @@ export function UpdatePage() {
                   <label className="block text-sm font-medium text-gray-700">
                     开始日期
                   </label>
-                  <input
-                    type="text"
-                    value={formData.start ?? ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, start: e.target.value || null })
-                    }
-                    placeholder="YYYYMMDD（留空自动）"
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
+	                  <input
+	                    type="text"
+	                    value={formData.start ?? ''}
+	                    onChange={(e) =>
+	                      setFormData({ ...formData, start: e.target.value || null })
+	                    }
+	                    placeholder="YYYYMMDD（留空自动）"
+	                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+	                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     结束日期
                   </label>
-                  <input
-                    type="text"
-                    value={formData.end ?? ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, end: e.target.value || null })
-                    }
-                    placeholder="YYYYMMDD（留空到最新）"
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
+	                  <input
+	                    type="text"
+	                    value={formData.end ?? ''}
+	                    onChange={(e) =>
+	                      setFormData({ ...formData, end: e.target.value || null })
+	                    }
+	                    placeholder="YYYYMMDD（留空到最新）"
+	                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+	                  />
                 </div>
               </>
             ) : (
@@ -226,50 +232,50 @@ export function UpdatePage() {
                   <label className="block text-sm font-medium text-gray-700">
                     目标日期
                   </label>
-                  <input
-                    type="text"
-                    value={waitData.target_date ?? ''}
-                    onChange={(e) =>
-                      setWaitData({
-                        ...waitData,
-                        target_date: e.target.value || null,
-                      })
-                    }
-                    placeholder="YYYYMMDD（留空为今日）"
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
+	                  <input
+	                    type="text"
+	                    value={waitData.target_date ?? ''}
+	                    onChange={(e) =>
+	                      setWaitData({
+	                        ...waitData,
+	                        target_date: e.target.value || null,
+	                      })
+	                    }
+	                    placeholder="YYYYMMDD（留空为今日）"
+	                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+	                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     轮询间隔（秒）
                   </label>
-                  <input
-                    type="number"
-                    value={waitData.interval_seconds}
-                    onChange={(e) =>
-                      setWaitData({
-                        ...waitData,
-                        interval_seconds: parseInt(e.target.value) || 300,
-                      })
-                    }
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
+	                  <input
+	                    type="number"
+	                    value={waitData.interval_seconds}
+	                    onChange={(e) =>
+	                      setWaitData({
+	                        ...waitData,
+	                        interval_seconds: parseInt(e.target.value) || 300,
+	                      })
+	                    }
+	                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+	                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     超时时间（秒）
                   </label>
-                  <input
-                    type="number"
-                    value={waitData.timeout_seconds}
-                    onChange={(e) =>
-                      setWaitData({
-                        ...waitData,
-                        timeout_seconds: parseInt(e.target.value) || 7200,
-                      })
-                    }
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
+	                  <input
+	                    type="number"
+	                    value={waitData.timeout_seconds}
+	                    onChange={(e) =>
+	                      setWaitData({
+	                        ...waitData,
+	                        timeout_seconds: parseInt(e.target.value) || 7200,
+	                      })
+	                    }
+	                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+	                  />
                 </div>
               </>
             )}
@@ -278,28 +284,28 @@ export function UpdatePage() {
               <label className="block text-sm font-medium text-gray-700">
                 修复天数
               </label>
-              <input
-                type="number"
-                value={mode === 'normal' ? formData.repair_days : waitData.repair_days}
-                onChange={(e) => {
-                  const repair_days = parseInt(e.target.value) || 30;
-                  if (mode === 'normal') {
-                    setFormData({ ...formData, repair_days });
-                  } else {
-                    setWaitData({ ...waitData, repair_days });
-                  }
-                }}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
+	              <input
+	                type="number"
+	                value={mode === 'normal' ? formData.repair_days : waitData.repair_days}
+	                onChange={(e) => {
+	                  const repair_days = parseInt(e.target.value) || 30;
+	                  if (mode === 'normal') {
+	                    setFormData({ ...formData, repair_days });
+	                  } else {
+	                    setWaitData({ ...waitData, repair_days });
+	                  }
+	                }}
+	                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+	              />
             </div>
           </div>
 
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <button
-              onClick={handleUpdate}
-              disabled={isPending || (mode === 'wait' && waitJob?.status === 'running')}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:bg-blue-400 sm:w-auto"
-            >
+	          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+	            <button
+	              onClick={handleUpdate}
+	              disabled={isPending || (mode === 'wait' && waitJob?.status === 'running')}
+	              className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[color:var(--sf-primary-600)] px-4 py-2 text-white hover:bg-[color:var(--sf-primary-700)] disabled:bg-[color:var(--sf-primary-400)] sm:w-auto"
+	            >
               {isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
@@ -341,13 +347,13 @@ export function UpdatePage() {
       <div className="rounded-lg bg-white p-6 shadow">
         <h2 className="mb-4 text-lg font-semibold text-gray-900">检查数据可用性</h2>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <input
-            type="text"
-            value={checkDate}
-            onChange={(e) => setCheckDate(e.target.value)}
-            placeholder="YYYYMMDD"
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:w-48"
-          />
+	        <input
+	          type="text"
+	          value={checkDate}
+	          onChange={(e) => setCheckDate(e.target.value)}
+	          placeholder="YYYYMMDD"
+	          className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)] sm:w-48"
+	        />
           <button
             onClick={() => checkAvailability()}
             disabled={!checkDate || checkDate.length !== 8}
@@ -393,45 +399,45 @@ export function UpdatePage() {
         </div>
       )}
 
-      {mode === 'wait' && waitJobUi && waitJob && (
-        <div
-          className={`rounded-lg p-4 ${
-            waitJobUi.tone === 'success'
-              ? 'bg-green-50'
-              : waitJobUi.tone === 'info'
-                ? 'bg-blue-50'
-                : waitJobUi.tone === 'warning'
-                  ? 'bg-yellow-50'
-                  : 'bg-red-50'
-          }`}
-        >
+	      {mode === 'wait' && waitJobUi && waitJob && (
+	        <div
+	          className={`rounded-lg p-4 ${
+	            waitJobUi.tone === 'success'
+	              ? 'bg-green-50'
+	              : waitJobUi.tone === 'info'
+	                ? 'bg-[color:var(--sf-primary-50)]'
+	                : waitJobUi.tone === 'warning'
+	                  ? 'bg-yellow-50'
+	                  : 'bg-red-50'
+	          }`}
+	        >
           <div className="flex items-start gap-3">
             {waitJobUi.icon}
             <div className="min-w-0">
               <p
-                className={`text-sm font-medium ${
-                  waitJobUi.tone === 'success'
-                    ? 'text-green-800'
-                    : waitJobUi.tone === 'info'
-                      ? 'text-blue-800'
-                      : waitJobUi.tone === 'warning'
-                        ? 'text-yellow-800'
-                        : 'text-red-800'
-                }`}
-              >
+	                className={`text-sm font-medium ${
+	                  waitJobUi.tone === 'success'
+	                    ? 'text-green-800'
+	                    : waitJobUi.tone === 'info'
+	                      ? 'text-[color:var(--sf-primary-800)]'
+	                      : waitJobUi.tone === 'warning'
+	                        ? 'text-yellow-800'
+	                        : 'text-red-800'
+	                }`}
+	              >
                 {waitJobUi.title}
               </p>
               <p
-                className={`mt-1 text-sm ${
-                  waitJobUi.tone === 'success'
-                    ? 'text-green-700'
-                    : waitJobUi.tone === 'info'
-                      ? 'text-blue-700'
-                      : waitJobUi.tone === 'warning'
-                        ? 'text-yellow-700'
-                        : 'text-red-700'
-                }`}
-              >
+	                className={`mt-1 text-sm ${
+	                  waitJobUi.tone === 'success'
+	                    ? 'text-green-700'
+	                    : waitJobUi.tone === 'info'
+	                      ? 'text-[color:var(--sf-primary-700)]'
+	                      : waitJobUi.tone === 'warning'
+	                        ? 'text-yellow-700'
+	                        : 'text-red-700'
+	                }`}
+	              >
                 目标日期: {formatDate(waitJob.target_date)} | 提供商: {waitJob.provider} | 尝试次数: {waitJob.attempts} | 耗时: {waitJob.elapsed_seconds.toFixed(1)}秒
               </p>
               <p className="mt-1 text-xs text-gray-600">

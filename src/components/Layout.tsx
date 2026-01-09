@@ -11,10 +11,12 @@ import {
   Terminal,
   Menu,
   X,
+  Palette,
 } from 'lucide-react';
 import { useHealth } from '../hooks/useApi';
 import { logout, useMe } from '../hooks/useAuth';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTheme } from '../hooks/useTheme';
 
 const navItems: Array<{
   to: string;
@@ -34,6 +36,7 @@ const navItems: Array<{
 export function Layout() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { theme, setTheme, themes } = useTheme();
   const health = useHealth();
   const authEnabled = health.data?.auth_enabled === true;
   const me = useMe(authEnabled);
@@ -61,7 +64,7 @@ export function Layout() {
       {/* Mobile top bar */}
       <header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between bg-gray-900 px-4 xl:hidden">
         <div className="flex items-center gap-2">
-          <Fish className="h-7 w-7 text-blue-400" />
+          <Fish className="h-7 w-7 text-[color:var(--sf-primary-400)]" />
           <span className="text-lg font-bold text-white">ScreenFish</span>
         </div>
         <button
@@ -93,7 +96,7 @@ export function Layout() {
           {/* Logo */}
           <div className="flex h-14 items-center justify-between gap-3 border-b border-gray-800 px-4 lg:h-16 lg:px-6">
             <div className="flex items-center gap-3">
-              <Fish className="h-8 w-8 text-blue-400" />
+              <Fish className="h-8 w-8 text-[color:var(--sf-primary-400)]" />
               <span className="text-xl font-bold text-white">ScreenFish</span>
             </div>
             <button
@@ -116,7 +119,7 @@ export function Layout() {
                 className={({ isActive }) =>
                   `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                     isActive
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-[color:var(--sf-primary-600)] text-white'
                       : 'text-gray-300 hover:bg-gray-800 hover:text-white'
                   }`
                 }
@@ -129,22 +132,45 @@ export function Layout() {
 
           {/* Footer */}
           <div className="border-t border-gray-800 p-4">
-            {authEnabled && me.data ? (
-              <div className="space-y-2">
-                <div className="text-xs text-gray-400">
-                  {me.data.username} ({me.data.role})
+            <div className="space-y-3">
+              <div>
+                <div className="mb-1 flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-gray-400">
+                    <Palette className="h-4 w-4" />
+                    主题颜色
+                  </div>
+                  <span className="h-2.5 w-2.5 rounded-full bg-[color:var(--sf-primary-500)]" />
                 </div>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="w-full rounded-md bg-gray-800 px-3 py-2 text-xs font-medium text-gray-200 hover:bg-gray-700"
+                <select
+                  value={theme}
+                  onChange={(e) => setTheme(e.target.value as typeof theme)}
+                  className="w-full rounded-md border border-gray-700 bg-gray-900 px-2 py-2 text-xs text-gray-200 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
                 >
-                  退出登录
-                </button>
+                  {themes.map((t) => (
+                    <option key={t.key} value={t.key}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
               </div>
-            ) : (
-              <p className="text-xs text-gray-500">A-Share Stock Screener</p>
-            )}
+
+              {authEnabled && me.data ? (
+                <div className="space-y-2">
+                  <div className="text-xs text-gray-400">
+                    {me.data.username} ({me.data.role})
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="w-full rounded-md bg-gray-800 px-3 py-2 text-xs font-medium text-gray-200 hover:bg-gray-700"
+                  >
+                    退出登录
+                  </button>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500">A-Share Stock Screener</p>
+              )}
+            </div>
           </div>
         </div>
         </aside>
@@ -154,7 +180,7 @@ export function Layout() {
         <Suspense
           fallback={
             <div className="flex justify-center py-16">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-[color:var(--sf-primary-600)] border-t-transparent" />
             </div>
           }
         >

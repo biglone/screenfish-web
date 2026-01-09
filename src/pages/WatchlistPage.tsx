@@ -421,7 +421,7 @@ export function WatchlistPage() {
                 type="button"
                 onClick={handleCreateGroup}
                 disabled={watchlistBusy}
-                className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-2 py-1 text-sm text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-400"
+                className="inline-flex items-center gap-1 rounded-md bg-[color:var(--sf-primary-600)] px-2 py-1 text-sm text-white hover:bg-[color:var(--sf-primary-700)] disabled:cursor-not-allowed disabled:bg-[color:var(--sf-primary-400)]"
               >
                 <Plus className="h-4 w-4" />
                 新建
@@ -432,13 +432,18 @@ export function WatchlistPage() {
               {groups.map((g) => {
                 const active = activeGroup?.id === g.id;
                 return (
-                  <div key={g.id} className={`px-4 py-2 ${active ? 'bg-blue-50' : ''}`}>
+                  <div
+                    key={g.id}
+                    className={`px-4 py-2 ${active ? 'bg-[color:var(--sf-primary-50)]' : ''}`}
+                  >
                     <div className="flex items-center justify-between gap-2">
                       <button
                         type="button"
                         onClick={() => setActiveGroupId(g.id)}
                         className={`min-w-0 flex-1 truncate text-left text-sm ${
-                          active ? 'font-semibold text-blue-700' : 'text-gray-900 hover:text-blue-700'
+                          active
+                            ? 'font-semibold text-[color:var(--sf-primary-700)]'
+                            : 'text-gray-900 hover:text-[color:var(--sf-primary-700)]'
                         }`}
                         title={g.name}
                       >
@@ -479,7 +484,7 @@ export function WatchlistPage() {
 	                    value={filter}
 	                    onChange={(e) => setFilter(e.target.value)}
 	                    placeholder="搜索代码/名称..."
-	                    className="w-full rounded-md border border-gray-300 py-2 pl-10 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+	                    className="w-full rounded-md border border-gray-300 py-2 pl-10 pr-3 text-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
 	                  />
 	                </div>
 	              </div>
@@ -502,12 +507,12 @@ export function WatchlistPage() {
 	                                {s.name ? `${s.name} (${s.ts_code})` : s.ts_code}
 	                              </div>
 	                            </div>
-	                            <button
-	                              type="button"
-	                              onClick={() => handleAddStock(s)}
-	                              disabled={!activeGroup || inGroup || watchlistBusy}
-	                              className="h-7 rounded-md bg-blue-600 px-2 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-400"
-	                            >
+		                            <button
+		                              type="button"
+		                              onClick={() => handleAddStock(s)}
+		                              disabled={!activeGroup || inGroup || watchlistBusy}
+		                              className="h-7 rounded-md bg-[color:var(--sf-primary-600)] px-2 text-xs font-medium text-white hover:bg-[color:var(--sf-primary-700)] disabled:cursor-not-allowed disabled:bg-[color:var(--sf-primary-400)]"
+		                            >
 	                              {inGroup ? '已在组内' : '添加'}
 	                            </button>
 	                          </li>
@@ -523,7 +528,7 @@ export function WatchlistPage() {
 	                  value={addCode}
 	                  onChange={(e) => setAddCode(e.target.value)}
 	                  placeholder="输入 ts_code/名称 添加..."
-	                  className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+	                  className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
 	                />
 	                <button
 	                  type="submit"
@@ -539,14 +544,19 @@ export function WatchlistPage() {
                   <div className="py-6 text-center text-sm text-gray-500">暂无股票</div>
                 ) : (
 	                  <ul className="divide-y divide-gray-100">
-	                    {filteredItems.map((item) => {
-	                      const active = item.ts_code === resolvedActiveTsCode;
-	                      return (
+                    {filteredItems.map((item) => {
+                      const active = item.ts_code === resolvedActiveTsCode;
+                      return (
 	                        <li
                             key={item.ts_code}
                             data-ts-code={item.ts_code}
-                            className={active ? 'bg-gray-50' : ''}
+                            className={`relative ${
+                              active ? 'bg-[color:var(--sf-primary-50)]' : 'hover:bg-gray-50'
+                            }`}
                           >
+                            {active && (
+                              <div className="absolute inset-y-0 left-0 w-1 bg-[color:var(--sf-primary-600)]" />
+                            )}
 	                          <div className="flex items-center justify-between gap-2 px-3 py-2">
 	                            <button
 	                              type="button"
@@ -599,10 +609,10 @@ export function WatchlistPage() {
           style={{ touchAction: 'none' }}
           title="拖动调整宽度（双击重置）"
         >
-          <div className="group relative h-full w-full cursor-col-resize rounded-md hover:bg-gray-50">
-            <div className="absolute inset-y-2 left-1/2 w-px -translate-x-1/2 bg-gray-200 group-hover:bg-blue-500" />
-          </div>
-        </div>
+	          <div className="group relative h-full w-full cursor-col-resize rounded-md hover:bg-gray-50">
+	            <div className="absolute inset-y-2 left-1/2 w-px -translate-x-1/2 bg-gray-200 group-hover:bg-[color:var(--sf-primary-500)]" />
+	          </div>
+	        </div>
 
         {/* Right: detail */}
         <div className="min-w-0">

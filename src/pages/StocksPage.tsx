@@ -56,19 +56,19 @@ export function StocksPage() {
       <form onSubmit={handleSearch} className="flex flex-col gap-2 sm:flex-row">
         <div className="relative min-w-0 flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="搜索股票代码/名称/拼音首字母..."
-            className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
+	          <input
+	            type="text"
+	            value={searchInput}
+	            onChange={(e) => setSearchInput(e.target.value)}
+	            placeholder="搜索股票代码/名称/拼音首字母..."
+	            className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+	          />
         </div>
-        <button
-          type="submit"
-          disabled={isFetching}
-          className="w-full rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 sm:w-auto"
-        >
+	        <button
+	          type="submit"
+	          disabled={isFetching}
+	          className="w-full rounded-lg bg-[color:var(--sf-primary-600)] px-4 py-2 text-white hover:bg-[color:var(--sf-primary-700)] sm:w-auto"
+	        >
           {isFetching ? '搜索中...' : '搜索'}
         </button>
       </form>
@@ -83,7 +83,7 @@ export function StocksPage() {
       {/* Loading */}
       {isLoading && (
         <div className="flex justify-center py-8">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[color:var(--sf-primary-600)] border-t-transparent" />
         </div>
       )}
 
@@ -101,10 +101,10 @@ export function StocksPage() {
                     </div>
                     <div className="mt-1 font-mono text-xs text-gray-500">{stock.ts_code}</div>
 	                  </div>
-	                  <Link
-	                    to={`/stocks/${encodeURIComponent(stock.ts_code)}${stockDetailQuery}`}
-	                    className="flex-shrink-0 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-blue-600 hover:bg-gray-50 hover:text-blue-800"
-	                  >
+		                  <Link
+		                    to={`/stocks/${encodeURIComponent(stock.ts_code)}${stockDetailQuery}`}
+		                    className="flex-shrink-0 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-[color:var(--sf-primary-600)] hover:bg-gray-50 hover:text-[color:var(--sf-primary-800)]"
+		                  >
 	                    查看
 	                  </Link>
                 </div>
@@ -140,13 +140,13 @@ export function StocksPage() {
                       </span>
                     </td>
 	                    <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
-	                    <Link
-	                        to={`/stocks/${encodeURIComponent(stock.ts_code)}${stockDetailQuery}`}
-	                        className="text-blue-600 hover:text-blue-800"
-	                        onMouseEnter={() => {
-	                          void preloadStockDetailPage();
-	                        }}
-	                      >
+		                    <Link
+		                        to={`/stocks/${encodeURIComponent(stock.ts_code)}${stockDetailQuery}`}
+		                        className="text-[color:var(--sf-primary-600)] hover:text-[color:var(--sf-primary-800)]"
+		                        onMouseEnter={() => {
+		                          void preloadStockDetailPage();
+		                        }}
+		                      >
                         查看详情
                       </Link>
                     </td>

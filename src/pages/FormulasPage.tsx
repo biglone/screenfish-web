@@ -179,11 +179,11 @@ export function FormulasPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-gray-900">公式管理</h1>
-        {isAdmin ? (
-          <button
-            onClick={openCreateModal}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 sm:w-auto"
-          >
+	        {isAdmin ? (
+	          <button
+	            onClick={openCreateModal}
+	            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[color:var(--sf-primary-600)] px-4 py-2 text-sm font-medium text-white hover:bg-[color:var(--sf-primary-700)] sm:w-auto"
+	          >
             <Plus className="h-4 w-4" />
             新建公式
           </button>
@@ -192,10 +192,10 @@ export function FormulasPage() {
         )}
       </div>
 
-      {/* Help Info */}
-      <div className="rounded-lg bg-blue-50 p-4 text-sm text-blue-800">
-        <p className="font-medium">通达信公式语法说明:</p>
-        <ul className="mt-2 list-inside list-disc space-y-1 text-blue-700">
+	      {/* Help Info */}
+	      <div className="rounded-lg bg-[color:var(--sf-primary-50)] p-4 text-sm text-[color:var(--sf-primary-800)]">
+	        <p className="font-medium">通达信公式语法说明:</p>
+	        <ul className="mt-2 list-inside list-disc space-y-1 text-[color:var(--sf-primary-700)]">
           <li>
             变量: OPEN/O, HIGH/H, LOW/L, CLOSE/C, VOL/V, AMOUNT
           </li>
@@ -208,10 +208,10 @@ export function FormulasPage() {
             赋值: VAR:=表达式; 输出: 表达式;
           </li>
         </ul>
-        <p className="mt-2 text-blue-600">
-          示例: MA5:=MA(CLOSE,5); MA10:=MA(CLOSE,10); CROSS(MA5,MA10);
-        </p>
-      </div>
+	        <p className="mt-2 text-[color:var(--sf-primary-600)]">
+	          示例: MA5:=MA(CLOSE,5); MA10:=MA(CLOSE,10); CROSS(MA5,MA10);
+	        </p>
+	      </div>
 
       {/* Error */}
       {error && (
@@ -223,7 +223,7 @@ export function FormulasPage() {
       {/* Loading */}
       {isLoading && (
         <div className="flex justify-center py-8">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[color:var(--sf-primary-600)] border-t-transparent" />
         </div>
       )}
 
@@ -265,24 +265,24 @@ export function FormulasPage() {
                         <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
                           指标{formula.timeframe ? `(${formula.timeframe})` : ''}
                         </span>
-                      ) : (
-                        <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
-                          筛选
-                        </span>
-                      )}
+	                      ) : (
+	                        <span className="inline-flex items-center rounded-full bg-[color:var(--sf-primary-50)] px-2 py-0.5 text-xs font-medium text-[color:var(--sf-primary-700)]">
+	                          筛选
+	                        </span>
+	                      )}
                       <span className="text-xs text-gray-500">
                         {formula.enabled ? '已启用' : '已禁用'}
                       </span>
                     </div>
                   </div>
 
-                  <div className="flex flex-shrink-0 items-center gap-2">
-                    <button
-                      onClick={() => openEditModal(formula)}
-                      disabled={!isAdmin}
-                      className="rounded-md border border-gray-300 bg-white p-2 text-blue-600 hover:bg-gray-50 hover:text-blue-800 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
-                      title="编辑"
-                    >
+	                  <div className="flex flex-shrink-0 items-center gap-2">
+	                    <button
+	                      onClick={() => openEditModal(formula)}
+	                      disabled={!isAdmin}
+	                      className="rounded-md border border-gray-300 bg-white p-2 text-[color:var(--sf-primary-600)] hover:bg-gray-50 hover:text-[color:var(--sf-primary-800)] disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+	                      title="编辑"
+	                    >
                       <Pencil className="h-4 w-4" />
                     </button>
 
@@ -398,11 +398,11 @@ export function FormulasPage() {
                         <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
                           指标{formula.timeframe ? `(${formula.timeframe})` : ''}
                         </span>
-                      ) : (
-                        <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
-                          筛选
-                        </span>
-                      )}
+	                      ) : (
+	                        <span className="inline-flex items-center rounded-full bg-[color:var(--sf-primary-50)] px-2 py-0.5 text-xs font-medium text-[color:var(--sf-primary-700)]">
+	                          筛选
+	                        </span>
+	                      )}
                     </td>
                     <td className="max-w-xs truncate px-6 py-4">
                       <code className="text-sm text-gray-600">{formula.formula}</code>
@@ -412,12 +412,12 @@ export function FormulasPage() {
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
                       <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => openEditModal(formula)}
-                          disabled={!isAdmin}
-                          className="text-blue-600 hover:text-blue-800 disabled:cursor-not-allowed disabled:text-gray-400"
-                          title="编辑"
-                        >
+	                        <button
+	                          onClick={() => openEditModal(formula)}
+	                          disabled={!isAdmin}
+	                          className="text-[color:var(--sf-primary-600)] hover:text-[color:var(--sf-primary-800)] disabled:cursor-not-allowed disabled:text-gray-400"
+	                          title="编辑"
+	                        >
                           <Pencil className="h-4 w-4" />
                         </button>
                         {deleteConfirmId === formula.id ? (
@@ -479,14 +479,14 @@ export function FormulasPage() {
                 <label className="block text-sm font-medium text-gray-700">
                   名称 <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  placeholder="例如：金叉选股"
-                  required
-                />
+	                <input
+	                  type="text"
+	                  value={formName}
+	                  onChange={(e) => setFormName(e.target.value)}
+	                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+	                  placeholder="例如：金叉选股"
+	                  required
+	                />
               </div>
 
               <div>
@@ -499,18 +499,18 @@ export function FormulasPage() {
                     setFormFormula(e.target.value);
                     setValidationResult(null);
                   }}
-                  rows={5}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  placeholder="MA5:=MA(CLOSE,5);&#10;MA10:=MA(CLOSE,10);&#10;CROSS(MA5,MA10);"
-                  required
-                />
+	                  rows={5}
+	                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+	                  placeholder="MA5:=MA(CLOSE,5);&#10;MA10:=MA(CLOSE,10);&#10;CROSS(MA5,MA10);"
+	                  required
+	                />
                 <div className="mt-2 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleValidate}
-                    disabled={isValidating || !formFormula.trim()}
-                    className="text-sm text-blue-600 hover:text-blue-800 disabled:text-gray-400"
-                  >
+	                  <button
+	                    type="button"
+	                    onClick={handleValidate}
+	                    disabled={isValidating || !formFormula.trim()}
+	                    className="text-sm text-[color:var(--sf-primary-600)] hover:text-[color:var(--sf-primary-800)] disabled:text-gray-400"
+	                  >
                     {isValidating ? '验证中...' : '验证公式'}
                   </button>
                   {validationResult && (
@@ -534,23 +534,23 @@ export function FormulasPage() {
                 <label className="block text-sm font-medium text-gray-700">
                   描述
                 </label>
-                <input
-                  type="text"
-                  value={formDescription}
-                  onChange={(e) => setFormDescription(e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  placeholder="可选的描述信息"
-                />
+	                <input
+	                  type="text"
+	                  value={formDescription}
+	                  onChange={(e) => setFormDescription(e.target.value)}
+	                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+	                  placeholder="可选的描述信息"
+	                />
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">类型</label>
-                  <select
-                    value={formKind}
-                    onChange={(e) => setFormKind(e.target.value as 'screen' | 'indicator')}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  >
+	                  <select
+	                    value={formKind}
+	                    onChange={(e) => setFormKind(e.target.value as 'screen' | 'indicator')}
+	                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+	                  >
                     <option value="screen">筛选公式</option>
                     <option value="indicator">指标公式（用于绘图）</option>
                   </select>
@@ -558,12 +558,12 @@ export function FormulasPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700">周期</label>
-                  <select
-                    value={formTimeframe}
-                    onChange={(e) => setFormTimeframe(e.target.value as 'D' | 'W' | 'M')}
-                    disabled={formKind !== 'indicator'}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
-                  >
+	                  <select
+	                    value={formTimeframe}
+	                    onChange={(e) => setFormTimeframe(e.target.value as 'D' | 'W' | 'M')}
+	                    disabled={formKind !== 'indicator'}
+	                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)] disabled:bg-gray-100"
+	                  >
                     <option value="D">日线 (D)</option>
                     <option value="W">周线 (W)</option>
                     <option value="M">月线 (M)</option>
@@ -572,13 +572,13 @@ export function FormulasPage() {
               </div>
 
               <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="enabled"
-                  checked={formEnabled}
-                  onChange={(e) => setFormEnabled(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
+	                <input
+	                  type="checkbox"
+	                  id="enabled"
+	                  checked={formEnabled}
+	                  onChange={(e) => setFormEnabled(e.target.checked)}
+	                  className="h-4 w-4 rounded border-gray-300 accent-[color:var(--sf-primary-600)] focus:ring-[color:var(--sf-primary-500)]"
+	                />
                 <label htmlFor="enabled" className="text-sm text-gray-700">
                   启用此公式
                 </label>
@@ -598,11 +598,11 @@ export function FormulasPage() {
                 >
                   取消
                 </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-blue-400"
-                >
+	                <button
+	                  type="submit"
+	                  disabled={isSubmitting}
+	                  className="rounded-md bg-[color:var(--sf-primary-600)] px-4 py-2 text-sm font-medium text-white hover:bg-[color:var(--sf-primary-700)] disabled:bg-[color:var(--sf-primary-400)]"
+	                >
                   {isSubmitting ? '保存中...' : '保存'}
                 </button>
               </div>

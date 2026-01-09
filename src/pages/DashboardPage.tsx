@@ -96,7 +96,7 @@ function StatCard({
   color: 'blue' | 'green' | 'purple' | 'orange';
 }) {
   const colorClasses = {
-    blue: 'bg-blue-50 text-blue-600',
+    blue: 'bg-[color:var(--sf-primary-50)] text-[color:var(--sf-primary-600)]',
     green: 'bg-green-50 text-green-600',
     purple: 'bg-purple-50 text-purple-600',
     orange: 'bg-orange-50 text-orange-600',

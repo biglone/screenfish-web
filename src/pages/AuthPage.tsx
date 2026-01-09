@@ -94,39 +94,39 @@ export function AuthPage() {
           <div className="mt-1 text-sm text-gray-600">登录后使用全部功能</div>
         </div>
 
-        {health.isLoading ? (
-          <div className="flex justify-center py-8">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
-          </div>
-        ) : !authEnabled ? (
+	        {health.isLoading ? (
+	          <div className="flex justify-center py-8">
+	            <div className="h-8 w-8 animate-spin rounded-full border-4 border-[color:var(--sf-primary-600)] border-t-transparent" />
+	          </div>
+	        ) : !authEnabled ? (
           <div className="rounded-lg bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
             后端未开启登录鉴权（`STOCK_SCREENER_AUTH_ENABLED`）。
           </div>
         ) : (
           <>
             <div className="mb-4 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setMode('login')}
-                className={`rounded-lg px-3 py-2 text-sm font-medium ${
-                  mode === 'login'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
+	              <button
+	                type="button"
+	                onClick={() => setMode('login')}
+	                className={`rounded-lg px-3 py-2 text-sm font-medium ${
+	                  mode === 'login'
+	                    ? 'bg-[color:var(--sf-primary-600)] text-white'
+	                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+	                }`}
+	              >
                 登录
               </button>
-              <button
-                type="button"
-                onClick={() => registerTabEnabled && setMode('register')}
-                disabled={!registerTabEnabled}
-                className={`rounded-lg px-3 py-2 text-sm font-medium ${
-                  mode === 'register'
-                    ? 'bg-blue-600 text-white'
-                    : registerTabEnabled
-                      ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      : 'bg-gray-100 text-gray-400'
-                }`}
+	              <button
+	                type="button"
+	                onClick={() => registerTabEnabled && setMode('register')}
+	                disabled={!registerTabEnabled}
+	                className={`rounded-lg px-3 py-2 text-sm font-medium ${
+	                  mode === 'register'
+	                    ? 'bg-[color:var(--sf-primary-600)] text-white'
+	                    : registerTabEnabled
+	                      ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+	                      : 'bg-gray-100 text-gray-400'
+	                }`}
               >
                 注册
               </button>
@@ -138,35 +138,35 @@ export function AuthPage() {
               </div>
             )}
 
-            {mode === 'register' && emailRegisterEnabled && (
-              <div className="mb-4 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-800">
-                需要邮箱验证码注册（更安全）。
-              </div>
-            )}
+	            {mode === 'register' && emailRegisterEnabled && (
+	              <div className="mb-4 rounded-lg bg-[color:var(--sf-primary-50)] px-4 py-3 text-sm text-[color:var(--sf-primary-800)]">
+	                需要邮箱验证码注册（更安全）。
+	              </div>
+	            )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {mode === 'register' && emailRegisterEnabled && (
                 <>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">邮箱</label>
-                    <input
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="name@example.com"
-                      autoComplete="email"
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
+	                    <input
+	                      value={email}
+	                      onChange={(e) => setEmail(e.target.value)}
+	                      placeholder="name@example.com"
+	                      autoComplete="email"
+	                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+	                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">验证码</label>
                     <div className="mt-1 flex gap-2">
-                      <input
-                        value={code}
-                        onChange={(e) => setCode(e.target.value)}
-                        placeholder="6 位数字"
-                        inputMode="numeric"
-                        className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
+	                      <input
+	                        value={code}
+	                        onChange={(e) => setCode(e.target.value)}
+	                        placeholder="6 位数字"
+	                        inputMode="numeric"
+	                        className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+	                      />
                       <button
                         type="button"
                         onClick={handleSendCode}
@@ -187,27 +187,27 @@ export function AuthPage() {
                   </div>
                 </>
               )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700">用户名</label>
-                <input
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder={mode === 'login' ? '用户名或邮箱' : '请输入用户名'}
-                  autoComplete="username"
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">密码</label>
-                <input
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  type="password"
-                  placeholder={mode === 'register' ? '至少 8 位' : '请输入密码'}
-                  autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
+	              <div>
+	                <label className="block text-sm font-medium text-gray-700">用户名</label>
+	                <input
+	                  value={username}
+	                  onChange={(e) => setUsername(e.target.value)}
+	                  placeholder={mode === 'login' ? '用户名或邮箱' : '请输入用户名'}
+	                  autoComplete="username"
+	                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+	                />
+	              </div>
+	              <div>
+	                <label className="block text-sm font-medium text-gray-700">密码</label>
+	                <input
+	                  value={password}
+	                  onChange={(e) => setPassword(e.target.value)}
+	                  type="password"
+	                  placeholder={mode === 'register' ? '至少 8 位' : '请输入密码'}
+	                  autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+	                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+	                />
+	              </div>
 
               {activeError && (
                 <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -215,8 +215,8 @@ export function AuthPage() {
                 </div>
               )}
 
-              <button
-                type="submit"
+	              <button
+	                type="submit"
                 disabled={
                   submitting ||
                   !username.trim() ||
@@ -224,8 +224,8 @@ export function AuthPage() {
                   (mode === 'register' && !registerTabEnabled) ||
                   (mode === 'register' && emailRegisterEnabled && (!email.trim() || !code.trim()))
                 }
-                className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
-              >
+	                className="w-full rounded-lg bg-[color:var(--sf-primary-600)] px-4 py-2 text-sm font-medium text-white hover:bg-[color:var(--sf-primary-700)] disabled:cursor-not-allowed disabled:bg-gray-300"
+	              >
                 {mode === 'login' ? '登录' : '注册'}
               </button>
             </form>

@@ -84,19 +84,19 @@ export function LogsPage() {
           <div className="lg:col-span-5">
             <label className="block text-sm font-medium text-gray-700">管理 Token（X-Admin-Token）</label>
             <div className="mt-1 flex flex-col gap-2 sm:flex-row">
-              <input
-                value={adminToken}
-                onChange={(e) => setAdminToken(e.target.value)}
-                placeholder="请输入后端设置的 STOCK_SCREENER_ADMIN_TOKEN"
-                disabled={!isAdmin}
-                className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-              <button
-                type="button"
-                onClick={handleSaveToken}
-                disabled={!isAdmin}
-                className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 sm:w-auto"
-              >
+	              <input
+	                value={adminToken}
+	                onChange={(e) => setAdminToken(e.target.value)}
+	                placeholder="请输入后端设置的 STOCK_SCREENER_ADMIN_TOKEN"
+	                disabled={!isAdmin}
+	                className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+	              />
+	              <button
+	                type="button"
+	                onClick={handleSaveToken}
+	                disabled={!isAdmin}
+	                className="w-full rounded-md bg-[color:var(--sf-primary-600)] px-3 py-2 text-sm font-medium text-white hover:bg-[color:var(--sf-primary-700)] sm:w-auto"
+	              >
                 保存
               </button>
             </div>
@@ -109,12 +109,12 @@ export function LogsPage() {
 
           <div className="lg:col-span-2">
             <label className="block text-sm font-medium text-gray-700">尾部行数</label>
-            <select
-              value={tailLines}
-              onChange={(e) => setTailLines(parseInt(e.target.value, 10))}
-              disabled={!isAdmin}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            >
+	            <select
+	              value={tailLines}
+	              onChange={(e) => setTailLines(parseInt(e.target.value, 10))}
+	              disabled={!isAdmin}
+	              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+	            >
               <option value={100}>100</option>
               <option value={200}>200</option>
               <option value={500}>500</option>
@@ -124,28 +124,28 @@ export function LogsPage() {
 
           <div className="lg:col-span-2">
             <label className="block text-sm font-medium text-gray-700">自动刷新</label>
-            <label className="mt-2 flex items-center gap-2 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={follow}
-                onChange={(e) => setFollow(e.target.checked)}
-                disabled={!isAdmin}
-                className="h-4 w-4 text-blue-600"
-              />
-              跟随
-            </label>
+	            <label className="mt-2 flex items-center gap-2 text-sm text-gray-700">
+	              <input
+	                type="checkbox"
+	                checked={follow}
+	                onChange={(e) => setFollow(e.target.checked)}
+	                disabled={!isAdmin}
+	                className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
+	              />
+	              跟随
+	            </label>
             <div className="mt-1 text-xs text-gray-500">每 2 秒刷新一次</div>
           </div>
 
           <div className="lg:col-span-3">
             <label className="block text-sm font-medium text-gray-700">筛选</label>
-            <input
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              placeholder="过滤关键字（本地）"
-              disabled={!isAdmin}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
+	          <input
+	            value={filter}
+	            onChange={(e) => setFilter(e.target.value)}
+	            placeholder="过滤关键字（本地）"
+	            disabled={!isAdmin}
+	            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+	          />
           </div>
         </div>
 
