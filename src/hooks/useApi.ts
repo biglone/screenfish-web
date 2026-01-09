@@ -3,6 +3,7 @@ import api from '../api/client';
 import type {
   UpdateRequest,
   UpdateWaitRequest,
+  UpdateWaitResponse,
   ScreenRequest,
 } from '../types/api';
 
@@ -12,6 +13,7 @@ export const queryKeys = {
   status: ['status'] as const,
   screen: (params: ScreenRequest) => ['screen', params] as const,
   availability: (date: string, provider: string) => ['availability', date, provider] as const,
+  updateWaitJob: (jobId: string) => ['updateWaitJob', jobId] as const,
 };
 
 // Health Check
@@ -50,6 +52,29 @@ export function useUpdateWait() {
     mutationFn: (request: UpdateWaitRequest) => api.updateWait(request),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.status });
+    },
+  });
+}
+
+export function useUpdateWaitJob(jobId: string | null, enabled = true) {
+  return useQuery<UpdateWaitResponse>({
+    queryKey: queryKeys.updateWaitJob(jobId ?? ''),
+    queryFn: () => api.getUpdateWaitJob(jobId!),
+    enabled: enabled && !!jobId,
+    retry: false,
+    refetchInterval: (query) => {
+      const status = (query.state.data as UpdateWaitResponse | undefined)?.status;
+      return status === 'running' ? 2000 : false;
+    },
+  });
+}
+
+export function useCancelUpdateWaitJob() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (jobId: string) => api.cancelUpdateWaitJob(jobId),
+    onSuccess: (data) => {
+      queryClient.setQueryData(queryKeys.updateWaitJob(data.job_id), data);
     },
   });
 }

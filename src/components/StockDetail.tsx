@@ -671,11 +671,11 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
       {/* Detail Modal */}
       {modalData && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center"
           onClick={() => setModalData(null)}
         >
           <div
-            className="mx-4 w-full max-w-md rounded-lg bg-white shadow-xl"
+            className="max-h-[90vh] w-full max-w-md overflow-auto rounded-lg bg-white shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">

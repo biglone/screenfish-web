@@ -1,8 +1,16 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { lazy } from 'react';
+import { Suspense, lazy } from 'react';
 import { Layout } from './components/Layout';
 import { RequireAuth } from './components/RequireAuth';
+
+function RouteFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gray-100">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+    </div>
+  );
+}
 
 const DashboardPage = lazy(async () => {
   const mod = await import('./pages/DashboardPage');
@@ -55,7 +63,14 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
-          <Route path="/auth" element={<AuthPage />} />
+          <Route
+            path="/auth"
+            element={
+              <Suspense fallback={<RouteFallback />}>
+                <AuthPage />
+              </Suspense>
+            }
+          />
           <Route path="/" element={<RequireAuth><Layout /></RequireAuth>}>
             <Route index element={<DashboardPage />} />
             <Route path="stocks" element={<StocksPage />} />

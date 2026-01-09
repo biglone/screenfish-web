@@ -208,9 +208,9 @@ export function ScreenPage() {
 
       {/* Formula Selection */}
       <div className="rounded-lg bg-white p-6 shadow">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-lg font-semibold text-gray-900">选择筛选公式</h2>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             {enabledFormulas.length > 0 && (
               <button
                 onClick={handleSelectAll}

@@ -68,7 +68,7 @@ export function LogsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-gray-900">后端日志</h1>
         {headerRight}
       </div>
@@ -83,7 +83,7 @@ export function LogsPage() {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
           <div className="lg:col-span-5">
             <label className="block text-sm font-medium text-gray-700">管理 Token（X-Admin-Token）</label>
-            <div className="mt-1 flex gap-2">
+            <div className="mt-1 flex flex-col gap-2 sm:flex-row">
               <input
                 value={adminToken}
                 onChange={(e) => setAdminToken(e.target.value)}
@@ -95,7 +95,7 @@ export function LogsPage() {
                 type="button"
                 onClick={handleSaveToken}
                 disabled={!isAdmin}
-                className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 sm:w-auto"
               >
                 保存
               </button>

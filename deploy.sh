@@ -11,6 +11,7 @@ FRONTEND_DIR="$SCRIPT_DIR"
 
 # 端口配置（可通过环境变量覆盖）
 BACKEND_PORT="${BACKEND_PORT:-8000}"
+BACKEND_HOST="${BACKEND_HOST:-127.0.0.1}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
 DEFAULT_PROXY_TARGET="http://localhost:$BACKEND_PORT"
 
@@ -59,8 +60,9 @@ fi
 log_info "[1/3] 启动后端服务 (端口 $BACKEND_PORT)..."
 cd "$BACKEND_DIR"
 
-# 设置 CORS（默认允许所有来源；建议在公网部署时设置为明确的域名列表）
-export STOCK_SCREENER_CORS_ORIGINS="${STOCK_SCREENER_CORS_ORIGINS:-*}"
+# CORS：使用 Vite proxy（/api -> backend）时通常不需要配置。
+# 如需浏览器直接访问后端（跨域），请显式设置为你的前端域名列表（不要用 *）。
+export STOCK_SCREENER_CORS_ORIGINS="${STOCK_SCREENER_CORS_ORIGINS:-}"
 
 # 激活虚拟环境（如果存在）
 if [ -f ".venv/bin/activate" ]; then
@@ -70,7 +72,7 @@ fi
 
 # 启动 uvicorn（后台运行，输出到日志文件）
 nohup python -m uvicorn stock_screener.server:create_app_from_env \
-    --factory --host 0.0.0.0 --port $BACKEND_PORT \
+    --factory --host "$BACKEND_HOST" --port $BACKEND_PORT \
     > "$FRONTEND_DIR/backend.log" 2>&1 &
 BACKEND_PID=$!
 log_info "后端 PID: $BACKEND_PID"
@@ -126,6 +128,7 @@ log_info "服务已全部启动!"
 log_info "=========================================="
 echo ""
 log_info "本地访问:"
+log_info "  后端监听: $BACKEND_HOST:$BACKEND_PORT"
 log_info "  后端 API: http://localhost:$BACKEND_PORT"
 log_info "  前端页面: http://localhost:$FRONTEND_PORT"
 echo ""

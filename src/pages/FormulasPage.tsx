@@ -177,12 +177,12 @@ export function FormulasPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-gray-900">公式管理</h1>
         {isAdmin ? (
           <button
             onClick={openCreateModal}
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 sm:w-auto"
           >
             <Plus className="h-4 w-4" />
             新建公式
@@ -230,128 +230,246 @@ export function FormulasPage() {
       {/* Formula List */}
       {data && (
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                  状态
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                  名称
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                  类型
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                  公式
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                  描述
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
-                  操作
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
-              {data.formulas.map((formula) => (
-                <tr key={formula.id} className="hover:bg-gray-50">
-                  <td className="whitespace-nowrap px-6 py-4">
-                    <button
-                      onClick={() => handleToggleEnabled(formula)}
-                      disabled={!isAdmin || toggleMutation.isPending}
-                      className={`transition-colors ${
-                        formula.enabled
-                          ? 'text-green-600 hover:text-green-700'
-                          : 'text-gray-400 hover:text-gray-500'
-                      }`}
-                      title={!isAdmin ? '需要管理员权限' : formula.enabled ? '点击禁用' : '点击启用'}
-                    >
-                      {formula.enabled ? (
-                        <ToggleRight className="h-6 w-6" />
-                      ) : (
-                        <ToggleLeft className="h-6 w-6" />
-                      )}
-                    </button>
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
-                    {formula.name}
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
-                    {formula.kind === 'indicator' ? (
-                      <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-                        指标{formula.timeframe ? `(${formula.timeframe})` : ''}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
-                        筛选
-                      </span>
-                    )}
-                  </td>
-                  <td className="max-w-xs truncate px-6 py-4">
-                    <code className="text-sm text-gray-600">{formula.formula}</code>
-                  </td>
-                  <td className="max-w-xs truncate px-6 py-4 text-sm text-gray-500">
-                    {formula.description || '-'}
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
-                    <div className="flex items-center justify-end gap-2">
+          {/* Mobile / Tablet cards */}
+          <div className="divide-y divide-gray-200 lg:hidden">
+            {data.formulas.map((formula) => (
+              <div key={formula.id} className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
                       <button
-                        onClick={() => openEditModal(formula)}
-                        disabled={!isAdmin}
-                        className="text-blue-600 hover:text-blue-800 disabled:cursor-not-allowed disabled:text-gray-400"
-                        title="编辑"
+                        onClick={() => handleToggleEnabled(formula)}
+                        disabled={!isAdmin || toggleMutation.isPending}
+                        className={`transition-colors ${
+                          formula.enabled
+                            ? 'text-green-600 hover:text-green-700'
+                            : 'text-gray-400 hover:text-gray-500'
+                        }`}
+                        title={
+                          !isAdmin ? '需要管理员权限' : formula.enabled ? '点击禁用' : '点击启用'
+                        }
                       >
-                        <Pencil className="h-4 w-4" />
+                        {formula.enabled ? (
+                          <ToggleRight className="h-6 w-6" />
+                        ) : (
+                          <ToggleLeft className="h-6 w-6" />
+                        )}
                       </button>
-                      {deleteConfirmId === formula.id ? (
-                        <>
-                          <button
-                            onClick={() => deleteMutation.mutate(formula.id)}
-                            disabled={!isAdmin || deleteMutation.isPending}
-                            className="text-red-600 hover:text-red-800 disabled:cursor-not-allowed disabled:text-gray-400"
-                            title="确认删除"
-                          >
-                            <Check className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => setDeleteConfirmId(null)}
-                            disabled={!isAdmin}
-                            className="text-gray-600 hover:text-gray-800 disabled:cursor-not-allowed disabled:text-gray-400"
-                            title="取消"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          onClick={() => setDeleteConfirmId(formula.id)}
-                          disabled={!isAdmin}
-                          className="text-red-600 hover:text-red-800 disabled:cursor-not-allowed disabled:text-gray-400"
-                          title="删除"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
+                      <div className="truncate text-sm font-semibold text-gray-900">
+                        {formula.name}
+                      </div>
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
 
-          {data.formulas.length === 0 && (
-            <div className="py-12 text-center text-gray-500">
-              暂无公式，点击"新建公式"创建
-            </div>
-          )}
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {formula.kind === 'indicator' ? (
+                        <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                          指标{formula.timeframe ? `(${formula.timeframe})` : ''}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                          筛选
+                        </span>
+                      )}
+                      <span className="text-xs text-gray-500">
+                        {formula.enabled ? '已启用' : '已禁用'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-shrink-0 items-center gap-2">
+                    <button
+                      onClick={() => openEditModal(formula)}
+                      disabled={!isAdmin}
+                      className="rounded-md border border-gray-300 bg-white p-2 text-blue-600 hover:bg-gray-50 hover:text-blue-800 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+                      title="编辑"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+
+                    {deleteConfirmId === formula.id ? (
+                      <>
+                        <button
+                          onClick={() => deleteMutation.mutate(formula.id)}
+                          disabled={!isAdmin || deleteMutation.isPending}
+                          className="rounded-md border border-red-200 bg-white p-2 text-red-600 hover:bg-red-50 hover:text-red-800 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+                          title="确认删除"
+                        >
+                          <Check className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteConfirmId(null)}
+                          disabled={!isAdmin}
+                          className="rounded-md border border-gray-300 bg-white p-2 text-gray-600 hover:bg-gray-50 hover:text-gray-800 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+                          title="取消"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => setDeleteConfirmId(formula.id)}
+                        disabled={!isAdmin}
+                        className="rounded-md border border-gray-300 bg-white p-2 text-red-600 hover:bg-gray-50 hover:text-red-800 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+                        title="删除"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-3 space-y-3">
+                  <div>
+                    <div className="text-xs font-medium text-gray-500">公式</div>
+                    <code className="mt-1 block whitespace-pre-wrap break-words rounded-md bg-gray-50 p-2 text-xs text-gray-700">
+                      {formula.formula}
+                    </code>
+                  </div>
+                  <div>
+                    <div className="text-xs font-medium text-gray-500">描述</div>
+                    <div className="mt-1 text-sm text-gray-700">
+                      {formula.description || '-'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {data.formulas.length === 0 && (
+              <div className="py-12 text-center text-gray-500">
+                暂无公式，点击"新建公式"创建
+              </div>
+            )}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden overflow-x-auto lg:block">
+            <table className="min-w-[1100px] divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    状态
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    名称
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    类型
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    公式
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    描述
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                    操作
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {data.formulas.map((formula) => (
+                  <tr key={formula.id} className="hover:bg-gray-50">
+                    <td className="whitespace-nowrap px-6 py-4">
+                      <button
+                        onClick={() => handleToggleEnabled(formula)}
+                        disabled={!isAdmin || toggleMutation.isPending}
+                        className={`transition-colors ${
+                          formula.enabled
+                            ? 'text-green-600 hover:text-green-700'
+                            : 'text-gray-400 hover:text-gray-500'
+                        }`}
+                        title={
+                          !isAdmin ? '需要管理员权限' : formula.enabled ? '点击禁用' : '点击启用'
+                        }
+                      >
+                        {formula.enabled ? (
+                          <ToggleRight className="h-6 w-6" />
+                        ) : (
+                          <ToggleLeft className="h-6 w-6" />
+                        )}
+                      </button>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
+                      {formula.name}
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
+                      {formula.kind === 'indicator' ? (
+                        <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                          指标{formula.timeframe ? `(${formula.timeframe})` : ''}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                          筛选
+                        </span>
+                      )}
+                    </td>
+                    <td className="max-w-xs truncate px-6 py-4">
+                      <code className="text-sm text-gray-600">{formula.formula}</code>
+                    </td>
+                    <td className="max-w-xs truncate px-6 py-4 text-sm text-gray-500">
+                      {formula.description || '-'}
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => openEditModal(formula)}
+                          disabled={!isAdmin}
+                          className="text-blue-600 hover:text-blue-800 disabled:cursor-not-allowed disabled:text-gray-400"
+                          title="编辑"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        {deleteConfirmId === formula.id ? (
+                          <>
+                            <button
+                              onClick={() => deleteMutation.mutate(formula.id)}
+                              disabled={!isAdmin || deleteMutation.isPending}
+                              className="text-red-600 hover:text-red-800 disabled:cursor-not-allowed disabled:text-gray-400"
+                              title="确认删除"
+                            >
+                              <Check className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirmId(null)}
+                              disabled={!isAdmin}
+                              className="text-gray-600 hover:text-gray-800 disabled:cursor-not-allowed disabled:text-gray-400"
+                              title="取消"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => setDeleteConfirmId(formula.id)}
+                            disabled={!isAdmin}
+                            className="text-red-600 hover:text-red-800 disabled:cursor-not-allowed disabled:text-gray-400"
+                            title="删除"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {data.formulas.length === 0 && (
+              <div className="py-12 text-center text-gray-500">
+                暂无公式，点击"新建公式"创建
+              </div>
+            )}
+          </div>
+
         </div>
       )}
 
       {/* Modal */}
       {modalMode && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-lg bg-white p-6 shadow-xl">
             <h2 className="mb-4 text-lg font-semibold text-gray-900">
               {modalMode === 'create' ? '新建公式' : '编辑公式'}
             </h2>

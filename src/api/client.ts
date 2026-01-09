@@ -163,6 +163,20 @@ class StockScreenerApi {
     return data;
   }
 
+  async getUpdateWaitJob(jobId: string): Promise<UpdateWaitResponse> {
+    const { data } = await this.client.get<UpdateWaitResponse>(
+      `/v1/update/wait/${encodeURIComponent(jobId)}`
+    );
+    return data;
+  }
+
+  async cancelUpdateWaitJob(jobId: string): Promise<UpdateWaitResponse> {
+    const { data } = await this.client.delete<UpdateWaitResponse>(
+      `/v1/update/wait/${encodeURIComponent(jobId)}`
+    );
+    return data;
+  }
+
   async screen(request: ScreenRequest): Promise<ScreenResponse> {
     const { data } = await this.client.post<ScreenResponse>('/v1/screen', request);
     return data;

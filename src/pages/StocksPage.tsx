@@ -36,7 +36,7 @@ export function StocksPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-gray-900">股票列表</h1>
         <span className="text-sm text-gray-500">
           共 {data?.total ?? 0} 只股票
@@ -44,8 +44,8 @@ export function StocksPage() {
       </div>
 
       {/* Search */}
-      <form onSubmit={handleSearch} className="flex gap-2">
-        <div className="relative flex-1">
+      <form onSubmit={handleSearch} className="flex flex-col gap-2 sm:flex-row">
+        <div className="relative min-w-0 flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
@@ -58,7 +58,7 @@ export function StocksPage() {
         <button
           type="submit"
           disabled={isFetching}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+          className="w-full rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 sm:w-auto"
         >
           {isFetching ? '搜索中...' : '搜索'}
         </button>
@@ -81,54 +81,79 @@ export function StocksPage() {
       {/* Stock List */}
       {data && (
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                  名称
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                  代码
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
-                  操作
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
-              {data.stocks.map((stock) => (
-                <tr key={stock.ts_code} className="hover:bg-gray-50">
-                  <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
-                    {stock.name || '-'}
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4">
-                    <span className="font-mono text-sm text-gray-500">
-                      {stock.ts_code}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
-                    <Link
-                      to={`/stocks/${encodeURIComponent(stock.ts_code)}`}
-                      className="text-blue-600 hover:text-blue-800"
-                      onMouseEnter={() => {
-                        void preloadStockDetailPage();
-                        void queryClient.prefetchQuery({
-                          queryKey: ['stock-daily', stock.ts_code],
-                          queryFn: () => api.getStockDaily(stock.ts_code, { limit: 250 }),
-                        });
-                      }}
-                    >
-                      查看详情
-                    </Link>
-                  </td>
+          {/* Mobile cards */}
+          <ul className="divide-y divide-gray-200 sm:hidden">
+            {data.stocks.map((stock) => (
+              <li key={stock.ts_code} className="px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium text-gray-900">
+                      {stock.name || '-'}
+                    </div>
+                    <div className="mt-1 font-mono text-xs text-gray-500">{stock.ts_code}</div>
+                  </div>
+                  <Link
+                    to={`/stocks/${encodeURIComponent(stock.ts_code)}`}
+                    className="flex-shrink-0 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-blue-600 hover:bg-gray-50 hover:text-blue-800"
+                  >
+                    查看
+                  </Link>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          {/* Desktop table */}
+          <div className="hidden overflow-x-auto sm:block">
+            <table className="min-w-[640px] divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    名称
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    代码
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                    操作
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {data.stocks.map((stock) => (
+                  <tr key={stock.ts_code} className="hover:bg-gray-50">
+                    <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
+                      {stock.name || '-'}
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4">
+                      <span className="font-mono text-sm text-gray-500">
+                        {stock.ts_code}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
+                      <Link
+                        to={`/stocks/${encodeURIComponent(stock.ts_code)}`}
+                        className="text-blue-600 hover:text-blue-800"
+                        onMouseEnter={() => {
+                          void preloadStockDetailPage();
+                          void queryClient.prefetchQuery({
+                            queryKey: ['stock-daily', stock.ts_code],
+                            queryFn: () => api.getStockDaily(stock.ts_code, { limit: 250 }),
+                          });
+                        }}
+                      >
+                        查看详情
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-gray-200 bg-gray-50 px-6 py-3">
+            <div className="flex flex-col gap-3 border-t border-gray-200 bg-gray-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <div className="text-sm text-gray-500">
                 第 {page + 1} / {totalPages} 页
               </div>
@@ -136,7 +161,7 @@ export function StocksPage() {
                 <button
                   onClick={() => setPage((p) => Math.max(0, p - 1))}
                   disabled={page === 0}
-                  className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex flex-1 items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
                 >
                   <ChevronLeft className="h-4 w-4" />
                   上一页
@@ -144,7 +169,7 @@ export function StocksPage() {
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                   disabled={page >= totalPages - 1}
-                  className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex flex-1 items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
                 >
                   下一页
                   <ChevronRight className="h-4 w-4" />

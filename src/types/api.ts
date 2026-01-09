@@ -32,13 +32,19 @@ export interface UpdateWaitRequest {
   timeout_seconds?: number;
 }
 
+export type UpdateWaitJobStatus = 'running' | 'succeeded' | 'failed' | 'timeout' | 'canceled';
+
 export interface UpdateWaitResponse {
+  job_id: string;
+  status: UpdateWaitJobStatus;
   ok: boolean;
+  provider: 'baostock' | 'tushare';
   target_date: string;
   latest_trade_date: string | null;
   attempts: number;
   elapsed_seconds: number;
   message: string;
+  last_error: string | null;
 }
 
 export interface ScreenRequest {
