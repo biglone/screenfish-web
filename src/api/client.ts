@@ -31,6 +31,12 @@ import type {
   WatchlistItemsUpsertRequest,
   WatchlistStateResponse,
   LogTailResponse,
+  AdminUserCreateRequest,
+  AdminUserItem,
+  AdminUserListResponse,
+  AdminUserSetPasswordRequest,
+  AdminUserTokenVersionResponse,
+  AdminUserUpdateRequest,
 } from '../types/api';
 
 // Get API base URL from environment or use default
@@ -328,6 +334,47 @@ class StockScreenerApi {
       updated_at: number;
       removed: number;
     }>(`/v1/watchlist/groups/${encodeURIComponent(groupId)}/items/remove`, request);
+    return data;
+  }
+
+  // Admin user management
+  async listAdminUsers(params?: {
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<AdminUserListResponse> {
+    const { data } = await this.client.get<AdminUserListResponse>('/v1/admin/users', { params });
+    return data;
+  }
+
+  async createAdminUser(request: AdminUserCreateRequest): Promise<AdminUserItem> {
+    const { data } = await this.client.post<AdminUserItem>('/v1/admin/users', request);
+    return data;
+  }
+
+  async updateAdminUser(userId: string, request: AdminUserUpdateRequest): Promise<AdminUserItem> {
+    const { data } = await this.client.put<AdminUserItem>(
+      `/v1/admin/users/${encodeURIComponent(userId)}`,
+      request
+    );
+    return data;
+  }
+
+  async setAdminUserPassword(
+    userId: string,
+    request: AdminUserSetPasswordRequest
+  ): Promise<AdminUserTokenVersionResponse> {
+    const { data } = await this.client.post<AdminUserTokenVersionResponse>(
+      `/v1/admin/users/${encodeURIComponent(userId)}/set-password`,
+      request
+    );
+    return data;
+  }
+
+  async revokeAdminUserTokens(userId: string): Promise<AdminUserTokenVersionResponse> {
+    const { data } = await this.client.post<AdminUserTokenVersionResponse>(
+      `/v1/admin/users/${encodeURIComponent(userId)}/revoke-tokens`
+    );
     return data;
   }
 

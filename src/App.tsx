@@ -40,6 +40,10 @@ const UpdatePage = lazy(async () => {
   const mod = await import('./pages/UpdatePage');
   return { default: mod.UpdatePage };
 });
+const UsersPage = lazy(async () => {
+  const mod = await import('./pages/UsersPage');
+  return { default: mod.UsersPage };
+});
 const LogsPage = lazy(async () => {
   const mod = await import('./pages/LogsPage');
   return { default: mod.LogsPage };
@@ -78,6 +82,7 @@ function App() {
             <Route path="watchlist" element={<WatchlistPage />} />
             <Route path="formulas" element={<FormulasPage />} />
             <Route path="screen" element={<ScreenPage />} />
+            <Route path="users" element={<UsersPage />} />
             <Route path="logs" element={<LogsPage />} />
             <Route path="update" element={<UpdatePage />} />
           </Route>

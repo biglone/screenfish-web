@@ -9,6 +9,7 @@ import {
   FileCode,
   Star,
   Terminal,
+  Users,
   Menu,
   X,
   Palette,
@@ -29,6 +30,7 @@ const navItems: Array<{
   { to: '/watchlist', icon: Star, label: '自选分组' },
   { to: '/formulas', icon: FileCode, label: '公式管理' },
   { to: '/screen', icon: Search, label: '股票筛选' },
+  { to: '/users', icon: Users, label: '用户管理', adminOnly: true },
   { to: '/logs', icon: Terminal, label: '运行日志', adminOnly: true },
   { to: '/update', icon: RefreshCw, label: '数据更新', adminOnly: true },
 ];

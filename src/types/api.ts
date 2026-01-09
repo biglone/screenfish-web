@@ -124,6 +124,48 @@ export interface AuthEmailRegisterRequest {
   password: string;
 }
 
+export interface AdminUserItem {
+  id: string;
+  username: string;
+  email?: string | null;
+  role: 'admin' | 'user';
+  disabled: boolean;
+  token_version: number;
+  created_at: number;
+  updated_at: number;
+  last_login_at?: number | null;
+  last_login_ip?: string | null;
+}
+
+export interface AdminUserListResponse {
+  total: number;
+  users: AdminUserItem[];
+}
+
+export interface AdminUserCreateRequest {
+  username: string;
+  password: string;
+  email?: string | null;
+  role?: 'admin' | 'user';
+  disabled?: boolean;
+}
+
+export interface AdminUserUpdateRequest {
+  username?: string;
+  email?: string | null;
+  role?: 'admin' | 'user';
+  disabled?: boolean;
+}
+
+export interface AdminUserSetPasswordRequest {
+  password: string;
+}
+
+export interface AdminUserTokenVersionResponse {
+  ok: boolean;
+  token_version: number;
+}
+
 export interface StockItem {
   ts_code: string;
   name: string | null;
