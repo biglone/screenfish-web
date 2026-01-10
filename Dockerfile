@@ -26,7 +26,11 @@ ENV VITE_BUILD_SHA=${VITE_BUILD_SHA}
 ARG VITE_BUILD_TIME=
 ENV VITE_BUILD_TIME=${VITE_BUILD_TIME}
 
-RUN npm run build
+RUN printf "VITE_API_URL=%s\nVITE_API_KEY=%s\nVITE_APP_VERSION=%s\nVITE_BUILD_SHA=%s\nVITE_BUILD_TIME=%s\n" \
+    "$VITE_API_URL" "$VITE_API_KEY" "$VITE_APP_VERSION" "$VITE_BUILD_SHA" "$VITE_BUILD_TIME" \
+    > .env.production.local \
+  && npm run build \
+  && rm -f .env.production.local
 
 
 FROM python:3.10-slim

@@ -5,7 +5,15 @@ import App from './App.tsx'
 import { applyStoredTheme } from './theme'
 import { ThemeProvider } from './hooks/useTheme'
 
-(globalThis as Record<string, unknown>).__SCREENFISH_WEB_BUILD__ = '2026-01-08'
+const build =
+  String(
+    import.meta.env.VITE_BUILD_TIME ??
+      import.meta.env.VITE_BUILD_SHA ??
+      import.meta.env.VITE_APP_VERSION ??
+      ''
+  ).trim() || 'unknown'
+
+;(globalThis as Record<string, unknown>).__SCREENFISH_WEB_BUILD__ = build
 
 applyStoredTheme()
 
