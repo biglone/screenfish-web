@@ -185,7 +185,7 @@ export function Layout() {
                 <p className="text-xs text-gray-500">A-Share Stock Screener</p>
               )}
 
-              <div className="text-[10px] text-gray-500">
+              <div className="text-xs text-gray-300">
                 版本：Web {webVersion}
                 {apiVersion ? ` · API ${apiVersion}` : ''}
               </div>
