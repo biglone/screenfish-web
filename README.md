@@ -2,6 +2,23 @@
 
 ScreenFish 的 Web UI（React + Vite），用于调用 `screenfish` 后端（FastAPI）的 `/v1` API。
 
+## Docker 一键启动（推荐）
+
+在后端目录（`../screenfish`）一键启动后端 + Web：
+
+```bash
+cd ../screenfish
+docker compose up -d --build
+```
+
+访问：`http://127.0.0.1:5174`
+
+如端口冲突，可临时指定（在 `../screenfish` 目录执行）：
+
+```bash
+SCREENFISH_WEB_PORT=15174 SCREENFISH_BACKEND_PORT=18000 docker compose up -d --build
+```
+
 ## 开发运行
 
 1) 启动后端（默认 `http://127.0.0.1:8000`）：

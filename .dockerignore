@@ -1,0 +1,11 @@
+.git
+node_modules
+dist
+dist-ssr
+
+*.log
+*.pid
+
+.env.local
+.env.*.local
+
