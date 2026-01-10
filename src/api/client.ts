@@ -11,6 +11,7 @@ import type {
   AvailabilityResponse,
   ExportEbkResponse,
   HealthResponse,
+  VersionResponse,
   AuthLoginRequest,
   AuthEmailCodeRequest,
   AuthEmailCodeResponse,
@@ -130,6 +131,11 @@ class StockScreenerApi {
 
   async health(): Promise<HealthResponse> {
     const { data } = await this.client.get<HealthResponse>('/v1/health');
+    return data;
+  }
+
+  async version(): Promise<VersionResponse> {
+    const { data } = await this.client.get<VersionResponse>('/v1/version');
     return data;
   }
 

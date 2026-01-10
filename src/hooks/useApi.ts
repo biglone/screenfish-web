@@ -11,6 +11,7 @@ import type {
 // Query Keys
 export const queryKeys = {
   health: ['health'] as const,
+  version: ['version'] as const,
   status: ['status'] as const,
   autoUpdateConfig: ['autoUpdateConfig'] as const,
   screen: (params: ScreenRequest) => ['screen', params] as const,
@@ -24,6 +25,15 @@ export function useHealth() {
     queryKey: queryKeys.health,
     queryFn: () => api.health(),
     retry: false,
+  });
+}
+
+export function useVersion() {
+  return useQuery({
+    queryKey: queryKeys.version,
+    queryFn: () => api.version(),
+    retry: false,
+    staleTime: 1000 * 60 * 10, // 10 minutes
   });
 }
 

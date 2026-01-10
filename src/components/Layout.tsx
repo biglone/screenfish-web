@@ -15,7 +15,7 @@ import {
   X,
   Palette,
 } from 'lucide-react';
-import { useHealth } from '../hooks/useApi';
+import { useHealth, useVersion } from '../hooks/useApi';
 import { logout, useMe } from '../hooks/useAuth';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../hooks/useTheme';
@@ -43,10 +43,17 @@ export function Layout() {
   const queryClient = useQueryClient();
   const { theme, setTheme, themes } = useTheme();
   const health = useHealth();
+  const version = useVersion();
   const authEnabled = health.data?.auth_enabled === true;
   const me = useMe(authEnabled);
   const isAdmin = !authEnabled || me.data?.role === 'admin';
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  const webVersion =
+    String(import.meta.env.VITE_APP_VERSION ?? import.meta.env.VITE_BUILD_SHA ?? '').trim() || 'dev';
+  const apiVersion = version.data
+    ? `${version.data.version}${version.data.git_sha ? `+${version.data.git_sha}` : ''}`
+    : '';
 
   const visibleItems = navItems.filter(
     (item) => (!item.adminOnly || isAdmin) && (!item.authOnly || authEnabled)
@@ -177,6 +184,11 @@ export function Layout() {
               ) : (
                 <p className="text-xs text-gray-500">A-Share Stock Screener</p>
               )}
+
+              <div className="text-[10px] text-gray-500">
+                版本：Web {webVersion}
+                {apiVersion ? ` · API ${apiVersion}` : ''}
+              </div>
             </div>
           </div>
         </div>

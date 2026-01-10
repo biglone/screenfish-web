@@ -92,6 +92,14 @@ export interface HealthResponse {
   auth_bootstrap?: boolean;
 }
 
+export interface VersionResponse {
+  name: string;
+  version: string;
+  git_sha?: string | null;
+  git_describe?: string | null;
+  build_time?: string | null;
+}
+
 export interface AuthUserResponse {
   id: string;
   username: string;
