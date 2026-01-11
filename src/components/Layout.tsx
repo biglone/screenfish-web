@@ -129,11 +129,15 @@ export function Layout() {
           {/* Logo */}
           <div
             className={`flex h-14 items-center justify-between gap-3 border-b border-gray-800 px-4 lg:h-16 lg:px-6 ${
-              sidebarCollapsed ? 'xl:px-3' : ''
+              sidebarCollapsed ? 'xl:px-2' : ''
             }`}
           >
             <div className={`flex items-center gap-3 ${sidebarCollapsed ? 'xl:justify-center' : ''}`}>
-              <Fish className="h-8 w-8 text-[color:var(--sf-primary-400)]" />
+              <Fish
+                className={`h-8 w-8 text-[color:var(--sf-primary-400)] ${
+                  sidebarCollapsed ? 'xl:h-6 xl:w-6' : ''
+                }`}
+              />
               <span className={`text-xl font-bold text-white ${sidebarCollapsed ? 'xl:hidden' : ''}`}>
                 ScreenFish
               </span>
@@ -142,10 +146,16 @@ export function Layout() {
               type="button"
               onClick={() => setSidebarCollapsed((v) => !v)}
               aria-label={sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}
-              className="hidden items-center justify-center rounded-md border border-gray-800 bg-gray-900 p-2 text-gray-200 hover:bg-gray-800 xl:inline-flex"
+              className={`hidden items-center justify-center rounded-md border border-gray-800 bg-gray-900 text-gray-200 hover:bg-gray-800 xl:inline-flex ${
+                sidebarCollapsed ? 'p-1.5' : 'p-2'
+              }`}
               title={sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}
             >
-              {sidebarCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
+              {sidebarCollapsed ? (
+                <ChevronRight className="h-4 w-4" />
+              ) : (
+                <ChevronLeft className="h-5 w-5" />
+              )}
             </button>
             <button
               type="button"
