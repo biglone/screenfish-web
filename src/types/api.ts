@@ -325,6 +325,7 @@ export interface WatchlistGroupUpdate {
 
 export interface WatchlistItemsUpsertRequest {
   items: WatchlistItem[];
+  ignore_unknown?: boolean;
 }
 
 export interface WatchlistItemsRemoveRequest {

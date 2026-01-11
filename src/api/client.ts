@@ -349,12 +349,21 @@ class StockScreenerApi {
   async upsertWatchlistItems(
     groupId: string,
     request: WatchlistItemsUpsertRequest
-  ): Promise<{ ok: boolean; group_id: string; updated_at: number; total: number }> {
+  ): Promise<{
+    ok: boolean;
+    group_id: string;
+    updated_at: number;
+    total: number;
+    unknown_total?: number;
+    unknown?: string[];
+  }> {
     const { data } = await this.client.post<{
       ok: boolean;
       group_id: string;
       updated_at: number;
       total: number;
+      unknown_total?: number;
+      unknown?: string[];
     }>(`/v1/watchlist/groups/${encodeURIComponent(groupId)}/items`, request);
     return data;
   }

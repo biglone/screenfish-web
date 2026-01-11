@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Download, Plus, Pencil, Trash2, Search, X } from 'lucide-react';
+import { Download, Upload, Plus, Pencil, Trash2, Search, X } from 'lucide-react';
 import api from '../api/client';
 import { useWatchlist } from '../hooks/useWatchlist';
 import { usePriceAdjust } from '../hooks/usePriceAdjust';
@@ -32,6 +32,56 @@ function buildEbkContent(tsCodes: string[]): string {
   return `\r\n${lines.join('\r\n')}`;
 }
 
+function ebkCodeToTsCode(ebkCode: string): string {
+  const raw = ebkCode.trim().replace(/^\uFEFF/, '');
+  if (!/^[012]\d{6}$/.test(raw)) throw new Error(`invalid ebk code: ${ebkCode}`);
+  const digits = raw.slice(1);
+  const marketFlag = raw[0];
+  const market = marketFlag === '0' ? 'SZ' : marketFlag === '1' ? 'SH' : 'BJ';
+  return `${digits}.${market}`;
+}
+
+function parseEbkContent(content: string): { tsCodes: string[]; ignoredLines: string[] } {
+  const normalized = String(content ?? '')
+    .replace(/^\uFEFF/, '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n');
+  const lines = normalized.split('\n');
+  const seen = new Set<string>();
+  const tsCodes: string[] = [];
+  const ignoredLines: string[] = [];
+
+  const parseLine = (rawLine: string): string => {
+    const line = rawLine.trim().replace(/^\uFEFF/, '');
+    if (/^\d{6}\.(SZ|SH|BJ)$/i.test(line)) return line.toUpperCase();
+    if (/^(SZ|SH|BJ)\d{6}$/i.test(line)) return `${line.slice(2)}.${line.slice(0, 2)}`.toUpperCase();
+    if (/^[012]\d{6}$/.test(line)) return ebkCodeToTsCode(line).toUpperCase();
+    if (/^\d{6}$/.test(line)) {
+      const digits = line;
+      // Best-effort fallback when market prefix is missing.
+      if (digits.startsWith('6') || digits.startsWith('9')) return `${digits}.SH`;
+      if (digits.startsWith('8') || digits.startsWith('4')) return `${digits}.BJ`;
+      return `${digits}.SZ`;
+    }
+    throw new Error('unrecognized');
+  };
+
+  for (const rawLine of lines) {
+    const trimmed = rawLine.trim();
+    if (!trimmed) continue;
+    try {
+      const tsCode = parseLine(trimmed);
+      if (seen.has(tsCode)) continue;
+      seen.add(tsCode);
+      tsCodes.push(tsCode);
+    } catch {
+      ignoredLines.push(trimmed);
+    }
+  }
+
+  return { tsCodes, ignoredLines };
+}
+
 function safeFilename(x: string): string {
   return x.replace(/[\\/:*?"<>|]+/g, '_').trim() || 'watchlist';
 }
@@ -44,7 +94,7 @@ const RESIZER_WIDTH_PX = 12;
 const RESIZER_STEP_PX = 24;
 
 export function WatchlistPage() {
-  const { groups, createGroup, renameGroup, deleteGroup, upsertItem, removeItems } =
+  const { groups, createGroup, renameGroup, deleteGroup, refresh, upsertItem, removeItems } =
     useWatchlist();
   const [priceAdjust] = usePriceAdjust();
 
@@ -53,10 +103,12 @@ export function WatchlistPage() {
   const [autoSelectDetail, setAutoSelectDetail] = useState(true);
   const [watchlistBusy, setWatchlistBusy] = useState(false);
   const [watchlistError, setWatchlistError] = useState<string | null>(null);
+  const [watchlistNotice, setWatchlistNotice] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
   const [addCode, setAddCode] = useState('');
 
   const splitContainerRef = useRef<HTMLDivElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
   const [splitEnabled, setSplitEnabled] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return window.matchMedia?.('(min-width: 1024px)')?.matches ?? false;
@@ -360,6 +412,7 @@ export function WatchlistPage() {
     if (tsCodes.length === 0) return;
     try {
       setWatchlistError(null);
+      setWatchlistNotice(null);
       const content = buildEbkContent(tsCodes);
       const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
@@ -380,11 +433,76 @@ export function WatchlistPage() {
     }
   };
 
+  const handleImportEbkClick = () => {
+    if (!activeGroup) return;
+    importInputRef.current?.click();
+  };
+
+  const handleImportEbkChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    e.target.value = '';
+    if (!file) return;
+    if (!activeGroup) return;
+
+    void (async () => {
+      try {
+        setWatchlistBusy(true);
+        setWatchlistError(null);
+        setWatchlistNotice(null);
+
+        const content = await file.text();
+        const { tsCodes, ignoredLines } = parseEbkContent(content);
+        if (tsCodes.length === 0) {
+          throw new Error('文件中未解析到任何股票代码（请确认是通达信导出的 .EBK 文件）');
+        }
+
+        const res = await api.upsertWatchlistItems(activeGroup.id, {
+          items: tsCodes.map((ts_code) => ({ ts_code, name: null })),
+          ignore_unknown: true,
+        });
+        refresh();
+        const unknownTotal = typeof res.unknown_total === 'number' ? res.unknown_total : 0;
+
+        setFilter('');
+        setActiveGroupId(activeGroup.id);
+        setActiveTsCode((prev) => prev ?? tsCodes[0] ?? null);
+        setAutoSelectDetail(true);
+        setWatchlistNotice(
+          `已导入 ${Math.max(0, tsCodes.length - unknownTotal)} 只股票到「${activeGroup.name}」` +
+            (unknownTotal > 0 ? `，已跳过 ${unknownTotal} 个系统暂无数据的代码` : '') +
+            (ignoredLines.length > 0 ? `，已忽略 ${ignoredLines.length} 行无法识别的内容` : '')
+        );
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setWatchlistError(msg);
+      } finally {
+        setWatchlistBusy(false);
+      }
+    })();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-gray-900">自选分组</h1>
         <div className="flex flex-wrap items-center gap-3">
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".ebk,.txt"
+            className="hidden"
+            onChange={handleImportEbkChange}
+          />
+          <button
+            type="button"
+            onClick={handleImportEbkClick}
+            disabled={!activeGroup || watchlistBusy}
+            className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100"
+            title={activeGroup ? `导入到「${activeGroup.name}」` : '导入'}
+          >
+            <Upload className="h-4 w-4" />
+            导入 EBK
+          </button>
           <button
             type="button"
             onClick={handleExportEbk}
@@ -400,6 +518,10 @@ export function WatchlistPage() {
           </Link>
         </div>
       </div>
+
+      {watchlistNotice && (
+        <div className="rounded-lg bg-blue-50 p-4 text-blue-700">{watchlistNotice}</div>
+      )}
 
       {watchlistError && (
         <div className="rounded-lg bg-red-50 p-4 text-red-700">
