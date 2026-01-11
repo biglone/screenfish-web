@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Download, Upload, Plus, Pencil, Trash2, Search, X } from 'lucide-react';
+import { Download, Upload, Plus, Pencil, Trash2, Search, X, ArrowLeftRight } from 'lucide-react';
 import api from '../api/client';
 import { useWatchlist } from '../hooks/useWatchlist';
 import { usePriceAdjust } from '../hooks/usePriceAdjust';
@@ -106,6 +106,10 @@ export function WatchlistPage() {
   const [watchlistNotice, setWatchlistNotice] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
   const [addCode, setAddCode] = useState('');
+
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [compareGroupAId, setCompareGroupAId] = useState<string>('');
+  const [compareGroupBId, setCompareGroupBId] = useState<string>('');
 
   const splitContainerRef = useRef<HTMLDivElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -265,6 +269,64 @@ export function WatchlistPage() {
     const found = activeGroupId ? groups.find((g) => g.id === activeGroupId) : null;
     return found ?? groups[0];
   }, [activeGroupId, groups]);
+
+  const compareGroupA = useMemo(() => {
+    if (!compareGroupAId) return null;
+    return groups.find((g) => g.id === compareGroupAId) ?? null;
+  }, [compareGroupAId, groups]);
+
+  const compareGroupB = useMemo(() => {
+    if (!compareGroupBId) return null;
+    return groups.find((g) => g.id === compareGroupBId) ?? null;
+  }, [compareGroupBId, groups]);
+
+  const compareDiff = useMemo(() => {
+    const empty = {
+      onlyA: [] as string[],
+      onlyB: [] as string[],
+      common: [] as string[],
+      mapA: new Map<string, { ts_code: string; name?: string | null } | undefined>(),
+      mapB: new Map<string, { ts_code: string; name?: string | null } | undefined>(),
+    };
+    if (!compareGroupA || !compareGroupB) return empty;
+    const mapA = new Map<string, { ts_code: string; name?: string | null }>();
+    const mapB = new Map<string, { ts_code: string; name?: string | null }>();
+    for (const item of compareGroupA.items) {
+      mapA.set(item.ts_code, item);
+    }
+    for (const item of compareGroupB.items) {
+      mapB.set(item.ts_code, item);
+    }
+    const onlyA = Array.from(mapA.keys()).filter((x) => !mapB.has(x)).sort();
+    const onlyB = Array.from(mapB.keys()).filter((x) => !mapA.has(x)).sort();
+    const common = Array.from(mapA.keys()).filter((x) => mapB.has(x)).sort();
+    return { onlyA, onlyB, common, mapA, mapB };
+  }, [compareGroupA, compareGroupB]);
+
+  useEffect(() => {
+    if (!compareOpen) return;
+    if (groups.length < 2) {
+      setCompareOpen(false);
+      return;
+    }
+    const ids = new Set(groups.map((g) => g.id));
+    const defaultA = activeGroup?.id ?? groups[0]?.id ?? '';
+    const safeA = ids.has(compareGroupAId) ? compareGroupAId : defaultA;
+    const defaultB = groups.find((g) => g.id !== safeA)?.id ?? safeA;
+    const rawB = ids.has(compareGroupBId) ? compareGroupBId : defaultB;
+    const safeB = rawB === safeA ? defaultB : rawB;
+    if (safeA && safeA !== compareGroupAId) setCompareGroupAId(safeA);
+    if (safeB && safeB !== compareGroupBId) setCompareGroupBId(safeB);
+  }, [activeGroup?.id, compareGroupAId, compareGroupBId, compareOpen, groups]);
+
+  useEffect(() => {
+    if (!compareOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setCompareOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [compareOpen]);
 
   const resolvedActiveTsCode = useMemo(() => {
     if (!activeGroup) return null;
@@ -433,6 +495,31 @@ export function WatchlistPage() {
     }
   };
 
+  const handleOpenCompare = () => {
+    if (groups.length < 2) return;
+    const aId = activeGroup?.id ?? groups[0]?.id ?? '';
+    const bId = groups.find((g) => g.id !== aId)?.id ?? aId;
+    setCompareGroupAId(aId);
+    setCompareGroupBId(bId);
+    setCompareOpen(true);
+  };
+
+  const downloadEbkForTsCodes = (name: string, tsCodes: string[]) => {
+    if (tsCodes.length === 0) return;
+    const content = buildEbkContent(tsCodes);
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const now = new Date();
+    const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    a.download = `${safeFilename(name)}_${stamp}.ebk`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const handleImportEbkClick = () => {
     if (!activeGroup) return;
     importInputRef.current?.click();
@@ -525,6 +612,16 @@ export function WatchlistPage() {
           >
             <Download className="h-4 w-4" />
             导出 EBK
+          </button>
+          <button
+            type="button"
+            onClick={handleOpenCompare}
+            disabled={groups.length < 2}
+            className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100"
+            title={groups.length < 2 ? '至少需要 2 个分组才能对比' : '对比两个分组的差异'}
+          >
+            <ArrowLeftRight className="h-4 w-4" />
+            对比分组
           </button>
           <Link to="/screen" className="text-sm text-gray-500 hover:text-gray-700">
             去筛选并加入分组
@@ -774,6 +871,167 @@ export function WatchlistPage() {
           </div>
         </div>
       </div>
+
+      {compareOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center"
+          onClick={() => setCompareOpen(false)}
+        >
+          <div
+            className="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-white p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">对比分组</h2>
+                <div className="mt-1 text-sm text-gray-600">
+                  共同：{compareDiff.common.length} | 仅左侧：{compareDiff.onlyA.length} | 仅右侧：{compareDiff.onlyB.length}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCompareOpen(false)}
+                className="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                title="关闭"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">分组 A</label>
+                <select
+                  value={compareGroupAId}
+                  onChange={(e) => setCompareGroupAId(e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                >
+                  {groups.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name} ({g.items.length})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">分组 B</label>
+                <select
+                  value={compareGroupBId}
+                  onChange={(e) => setCompareGroupBId(e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                >
+                  {groups.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name} ({g.items.length})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {compareGroupA && compareGroupB && (
+              <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <DiffListCard
+                  title={`仅在「${compareGroupA.name}」`}
+                  tsCodes={compareDiff.onlyA}
+                  resolveName={(tsCode) => compareDiff.mapA.get(tsCode)?.name ?? null}
+                  onExport={() =>
+                    downloadEbkForTsCodes(
+                      `${compareGroupA.name}_only`,
+                      compareDiff.onlyA
+                    )
+                  }
+                  onPick={(tsCode) => {
+                    setActiveGroupId(compareGroupA.id);
+                    setActiveTsCode(tsCode);
+                    setAutoSelectDetail(true);
+                    setCompareOpen(false);
+                  }}
+                />
+
+                <DiffListCard
+                  title={`仅在「${compareGroupB.name}」`}
+                  tsCodes={compareDiff.onlyB}
+                  resolveName={(tsCode) => compareDiff.mapB.get(tsCode)?.name ?? null}
+                  onExport={() =>
+                    downloadEbkForTsCodes(
+                      `${compareGroupB.name}_only`,
+                      compareDiff.onlyB
+                    )
+                  }
+                  onPick={(tsCode) => {
+                    setActiveGroupId(compareGroupB.id);
+                    setActiveTsCode(tsCode);
+                    setAutoSelectDetail(true);
+                    setCompareOpen(false);
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DiffListCard({
+  title,
+  tsCodes,
+  resolveName,
+  onExport,
+  onPick,
+}: {
+  title: string;
+  tsCodes: string[];
+  resolveName: (tsCode: string) => string | null;
+  onExport: () => void;
+  onPick: (tsCode: string) => void;
+}) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow">
+      <div className="flex items-center justify-between gap-2 border-b border-gray-200 px-4 py-3">
+        <div className="min-w-0 truncate text-sm font-semibold text-gray-900">
+          {title} <span className="text-xs text-gray-400">({tsCodes.length})</span>
+        </div>
+        <button
+          type="button"
+          onClick={onExport}
+          disabled={tsCodes.length === 0}
+          className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100"
+        >
+          <Download className="h-3.5 w-3.5" />
+          导出 EBK
+        </button>
+      </div>
+      {tsCodes.length === 0 ? (
+        <div className="px-4 py-10 text-center text-sm text-gray-500">无差异</div>
+      ) : (
+        <div className="max-h-[420px] overflow-auto">
+          <ul className="divide-y divide-gray-100">
+            {tsCodes.map((tsCode) => {
+              const name = resolveName(tsCode);
+              return (
+                <li key={tsCode} className="hover:bg-gray-50">
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between gap-3 px-4 py-2 text-left"
+                    onClick={() => onPick(tsCode)}
+                    title="点击查看详情"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium text-gray-900">
+                        {name ? `${name} (${tsCode})` : tsCode}
+                      </div>
+                      {name && <div className="truncate text-xs text-gray-500">{tsCode}</div>}
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
