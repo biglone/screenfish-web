@@ -462,16 +462,29 @@ export function WatchlistPage() {
         });
         refresh();
         const unknownTotal = typeof res.unknown_total === 'number' ? res.unknown_total : 0;
+        const unknownCodes = Array.isArray(res.unknown)
+          ? res.unknown.map((x) => String(x ?? '').trim()).filter(Boolean)
+          : [];
+        const shownUnknownCodes = unknownCodes.slice(0, 10);
 
         setFilter('');
         setActiveGroupId(activeGroup.id);
         setActiveTsCode((prev) => prev ?? tsCodes[0] ?? null);
         setAutoSelectDetail(true);
-        setWatchlistNotice(
-          `已导入 ${Math.max(0, tsCodes.length - unknownTotal)} 只股票到「${activeGroup.name}」` +
-            (unknownTotal > 0 ? `，已跳过 ${unknownTotal} 个系统暂无数据的代码` : '') +
-            (ignoredLines.length > 0 ? `，已忽略 ${ignoredLines.length} 行无法识别的内容` : '')
-        );
+        const noticeLines = [
+          `已导入 ${Math.max(0, tsCodes.length - unknownTotal)} 只股票到「${activeGroup.name}」`,
+        ];
+        if (unknownTotal > 0) {
+          const suffix =
+            unknownTotal > shownUnknownCodes.length ? ` (+${unknownTotal - shownUnknownCodes.length})` : '';
+          noticeLines.push(
+            `已跳过 ${unknownTotal} 个系统暂无数据的代码：${shownUnknownCodes.join(', ')}${suffix}`
+          );
+        }
+        if (ignoredLines.length > 0) {
+          noticeLines.push(`已忽略 ${ignoredLines.length} 行无法识别的内容`);
+        }
+        setWatchlistNotice(noticeLines.join('\n'));
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         setWatchlistError(msg);
@@ -520,7 +533,9 @@ export function WatchlistPage() {
       </div>
 
       {watchlistNotice && (
-        <div className="rounded-lg bg-blue-50 p-4 text-blue-700">{watchlistNotice}</div>
+        <div className="whitespace-pre-wrap rounded-lg bg-blue-50 p-4 text-blue-700">
+          {watchlistNotice}
+        </div>
       )}
 
       {watchlistError && (
