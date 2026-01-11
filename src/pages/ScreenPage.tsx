@@ -44,11 +44,26 @@ export function ScreenPage() {
     queryFn: () => api.listFormulas({ enabledOnly: true, kind: 'screen' }),
   });
 
+  const tradeDatesQuery = useQuery({
+    queryKey: ['tradeDates', priceAdjust],
+    queryFn: () => api.listTradeDates({ limit: 260, order: 'desc', price_adjust: priceAdjust }),
+    staleTime: 60_000,
+    retry: false,
+  });
+
   const screenMutation = useScreenMutation();
   const exportMutation = useExportEbk();
 
   const enabledFormulas = formulasData?.formulas ?? [];
   const hits = screenMutation.data?.hits ?? [];
+
+  const availableTradeDates = tradeDatesQuery.data?.dates ?? [];
+  const rawDate = String(formData.date ?? 'latest').trim() || 'latest';
+  const quickDateValue =
+    rawDate === 'latest' || availableTradeDates.includes(rawDate) ? rawDate : '';
+  const dateInputValue = /^\d{8}$/.test(rawDate)
+    ? `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`
+    : '';
 
   const dateForIntegrity = String(formData.date ?? 'latest').trim() || 'latest';
   const canCheckIntegrity = dateForIntegrity === 'latest' || /^\d{8}$/.test(dateForIntegrity);
@@ -391,13 +406,49 @@ export function ScreenPage() {
             <label className="block text-sm font-medium text-gray-700">
               筛选日期
             </label>
-	            <input
-	              type="text"
-	              value={formData.date}
-	              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-	              placeholder="latest 或 YYYYMMDD"
-	              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
-	            />
+            <div className="mt-1 flex gap-2">
+              <select
+                value={quickDateValue}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (!v) return;
+                  setFormData({ ...formData, date: v });
+                }}
+                className="block w-44 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+              >
+                <option value="">手动选择</option>
+                <option value="latest">最新（自动）</option>
+                {availableTradeDates.map((d) => (
+                  <option key={d} value={d}>
+                    {formatDate(d)}
+                  </option>
+                ))}
+              </select>
+
+              <input
+                type="date"
+                value={dateInputValue}
+                onChange={(e) => {
+                  const iso = e.target.value;
+                  if (!iso) {
+                    setFormData({ ...formData, date: 'latest' });
+                    return;
+                  }
+                  const v = iso.replaceAll('-', '');
+                  setFormData({ ...formData, date: v });
+                }}
+                className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+              />
+            </div>
+            <div className="mt-1 text-xs text-gray-500">
+              {tradeDatesQuery.isLoading
+                ? '交易日加载中...'
+                : tradeDatesQuery.data
+                  ? `本地更新日志：${tradeDatesQuery.data.total} 个交易日`
+                  : tradeDatesQuery.error
+                    ? '交易日加载失败（仍可手动选择）'
+                    : '仍可手动选择交易日'}
+            </div>
           </div>
 
           <div>

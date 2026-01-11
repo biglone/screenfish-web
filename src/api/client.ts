@@ -9,6 +9,7 @@ import type {
   ScreenRequest,
   ScreenResponse,
   AvailabilityResponse,
+  TradeDateListResponse,
   DataIntegrityResponse,
   ExportEbkResponse,
   HealthResponse,
@@ -231,6 +232,16 @@ class StockScreenerApi {
     const { data } = await this.client.get<AvailabilityResponse>('/v1/data/availability', {
       params: { date, provider },
     });
+    return data;
+  }
+
+  async listTradeDates(params?: {
+    limit?: number;
+    offset?: number;
+    order?: 'asc' | 'desc';
+    price_adjust?: 'none' | 'qfq' | 'hfq';
+  }): Promise<TradeDateListResponse> {
+    const { data } = await this.client.get<TradeDateListResponse>('/v1/data/trade-dates', { params });
     return data;
   }
 

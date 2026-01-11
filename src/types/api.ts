@@ -82,6 +82,15 @@ export interface AvailabilityResponse {
   detail: string;
 }
 
+export type TradeDateOrder = 'asc' | 'desc';
+
+export interface TradeDateListResponse {
+  price_adjust: 'none' | 'qfq' | 'hfq';
+  total: number;
+  order: TradeDateOrder;
+  dates: string[];
+}
+
 export interface DataIntegrityCount {
   trade_date: string;
   rows: number;
