@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ExternalLink, X } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Maximize2, Minimize2, RotateCcw, SkipForward, X } from 'lucide-react';
 import {
   CandlestickSeries,
   HistogramSeries,
@@ -36,6 +36,12 @@ const DEFAULT_VISIBLE_BARS: Record<KlineTimeframe, number> = {
   D: 250,
   M: 60,
   Y: 20,
+};
+
+const PRICE_ADJUST_LABEL: Record<PriceAdjustMode, string> = {
+  none: '不复权',
+  qfq: '前复权',
+  hfq: '后复权',
 };
 
 interface HoverData {
@@ -198,6 +204,9 @@ export function StockDetail({ tsCode, priceAdjust = 'qfq', variant = 'page', onC
   const [timeframe, setTimeframe] = useState<KlineTimeframe>('D');
   const [showVolume, setShowVolume] = useState(true);
   const [showKdj, setShowKdj] = useState(true);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [chartHeight, setChartHeight] = useState<number>(CHART_HEIGHT);
+  const chartHeightRef = useRef<number>(CHART_HEIGHT);
   const mainAreaRatioRef = useRef<number>(
     1 - ((showVolume ? 1 : 0) + (showKdj ? 1 : 0)) * SUB_PANE_HEIGHT
   );
@@ -205,6 +214,12 @@ export function StockDetail({ tsCode, priceAdjust = 'qfq', variant = 'page', onC
   const lastClickDate = useRef<string | null>(null);
 
   const isPanel = variant === 'panel';
+  const priceAdjustLabel = PRICE_ADJUST_LABEL[priceAdjust] ?? priceAdjust;
+
+  const setChartHeightSafe = useCallback((height: number) => {
+    chartHeightRef.current = height;
+    setChartHeight(height);
+  }, []);
 
   useEffect(() => {
     // When switching to a different stock in the panel view, reset to sensible defaults.
@@ -212,9 +227,52 @@ export function StockDetail({ tsCode, priceAdjust = 'qfq', variant = 'page', onC
     setTimeframe('D');
     setShowVolume(true);
     setShowKdj(true);
+    setFullscreen(false);
+    setChartHeightSafe(CHART_HEIGHT);
     setHoverData(null);
     setModalData(null);
-  }, [tsCodeNormalized]);
+  }, [setChartHeightSafe, tsCodeNormalized]);
+
+  useEffect(() => {
+    if (!fullscreen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [fullscreen]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (modalData) {
+        setModalData(null);
+        return;
+      }
+      if (fullscreen) {
+        setFullscreen(false);
+      }
+    };
+    if (!modalData && !fullscreen) return;
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [fullscreen, modalData]);
+
+  useEffect(() => {
+    const apply = () => {
+      if (!fullscreen) {
+        setChartHeightSafe(CHART_HEIGHT);
+        return;
+      }
+      const next = Math.max(CHART_HEIGHT, Math.floor(window.innerHeight - 220));
+      setChartHeightSafe(next);
+    };
+
+    apply();
+    if (!fullscreen) return;
+    window.addEventListener('resize', apply);
+    return () => window.removeEventListener('resize', apply);
+  }, [fullscreen, setChartHeightSafe]);
 
   const dailyQuery = useInfiniteQuery({
     queryKey: ['stock-daily', tsCodeNormalized, priceAdjust],
@@ -302,7 +360,7 @@ export function StockDetail({ tsCode, priceAdjust = 'qfq', variant = 'page', onC
         return;
       }
 
-      const chartHeight = CHART_HEIGHT;
+      const chartHeight = chartHeightRef.current;
       if (param.point.y > chartHeight * mainAreaRatioRef.current) {
         setHoverData(null);
         return;
@@ -368,7 +426,7 @@ export function StockDetail({ tsCode, priceAdjust = 'qfq', variant = 'page', onC
     const width = chartContainerRef.current.clientWidth || 600;
     const chart = createChart(chartContainerRef.current, {
       width,
-      height: CHART_HEIGHT,
+      height: chartHeightRef.current,
       layout: {
         background: { color: '#ffffff' },
         textColor: '#333',
@@ -451,6 +509,12 @@ export function StockDetail({ tsCode, priceAdjust = 'qfq', variant = 'page', onC
       kdjLineSeriesRefs.current = [];
     };
   }, [handleCrosshairMove, handleChartClick]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    chart.applyOptions({ height: chartHeightRef.current });
+  }, [chartHeight]);
 
   const appliedInitialViewKeyRef = useRef<string>('');
   useEffect(() => {
@@ -770,9 +834,26 @@ export function StockDetail({ tsCode, priceAdjust = 'qfq', variant = 'page', onC
       )}
 
       {/* Chart */}
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white p-4">
+      {fullscreen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50"
+          onClick={() => setFullscreen(false)}
+        />
+      )}
+      <div
+        className={
+          fullscreen
+            ? 'fixed inset-2 z-50 flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white p-4 shadow-xl sm:inset-4'
+            : 'overflow-hidden rounded-lg border border-gray-200 bg-white p-4'
+        }
+      >
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">K线图</h2>
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-lg font-semibold text-gray-900">K线图</h2>
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+              {priceAdjustLabel}
+            </span>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-gray-500">周期</span>
             <div className="inline-flex overflow-hidden rounded-md border border-gray-300 bg-white shadow-sm">
@@ -846,9 +927,83 @@ export function StockDetail({ tsCode, priceAdjust = 'qfq', variant = 'page', onC
 	                />
 	                KDJ
 	              </label>
+
+            <span className="ml-2 text-sm text-gray-500">视图</span>
+            <button
+              type="button"
+              onClick={() => {
+                const chart = chartRef.current;
+                if (!chart) return;
+                const to = displayBars.length;
+                if (!to) return;
+                const from = Math.max(0, to - DEFAULT_VISIBLE_BARS[timeframe]);
+                chart.timeScale().setVisibleLogicalRange({ from, to });
+              }}
+              className="inline-flex h-9 items-center gap-1 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700 shadow-sm hover:bg-gray-50"
+              title="跳到最新（右侧）"
+            >
+              <SkipForward className="h-4 w-4" />
+              最新
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const chart = chartRef.current;
+                if (!chart) return;
+                chart.timeScale().fitContent();
+              }}
+              className="inline-flex h-9 items-center gap-1 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700 shadow-sm hover:bg-gray-50"
+              title="重置缩放/显示全部已加载数据"
+            >
+              <RotateCcw className="h-4 w-4" />
+              重置
+            </button>
+            <button
+              type="button"
+              onClick={() => setFullscreen((v) => !v)}
+              className="inline-flex h-9 items-center gap-1 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700 shadow-sm hover:bg-gray-50"
+              title={fullscreen ? '退出全屏（Esc）' : '全屏'}
+            >
+              {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              {fullscreen ? '退出' : '全屏'}
+            </button>
           </div>
         </div>
-        <div ref={chartContainerRef} className="relative w-full" style={{ height: CHART_HEIGHT }}>
+
+        {displayBars.length > 0 && (
+          <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-700">
+            {(() => {
+              const bar = hoverData?.bar ?? displayBars[displayBars.length - 1];
+              const prev =
+                hoverData?.prevBar ??
+                (displayBars.length > 1 ? displayBars[displayBars.length - 2] : null);
+              const { change, changePercent, isUp } = calcChange(bar, prev);
+              const tone = isUp ? 'text-red-600' : 'text-green-600';
+              return (
+                <>
+                  <span className="font-medium text-gray-900">{formatDate(bar.trade_date)}</span>
+                  <span className={tone}>
+                    收 {bar.close.toFixed(2)} ({isUp ? '+' : ''}
+                    {change.toFixed(2)} / {isUp ? '+' : ''}
+                    {changePercent.toFixed(2)}%)
+                  </span>
+                  <span className="text-gray-500">开 {bar.open.toFixed(2)}</span>
+                  <span className="text-gray-500">高 {bar.high.toFixed(2)}</span>
+                  <span className="text-gray-500">低 {bar.low.toFixed(2)}</span>
+                  <span className="text-gray-500">量 {(bar.vol / 10000).toFixed(2)}万</span>
+                  <span className="text-gray-500">额 {(bar.amount / 100000000).toFixed(2)}亿</span>
+                  <span className="text-gray-400">（移动鼠标查看，双击弹窗）</span>
+                </>
+              );
+            })()}
+          </div>
+        )}
+
+        <div
+          ref={chartContainerRef}
+          className={fullscreen ? 'relative w-full flex-1' : 'relative w-full'}
+          style={{ height: chartHeight }}
+        >
 	          {dailyQuery.isFetching && displayBars.length === 0 && (
 	            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70">
 	              <div className="h-8 w-8 animate-spin rounded-full border-4 border-[color:var(--sf-primary-600)] border-t-transparent" />
@@ -1013,7 +1168,7 @@ export function StockDetail({ tsCode, priceAdjust = 'qfq', variant = 'page', onC
       )}
 
       {/* Latest Data */}
-      {dailyBars.length > 0 && (
+      {!fullscreen && dailyBars.length > 0 && (
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
           <div className="border-b border-gray-200 bg-gray-50 px-6 py-3">
             <h2 className="text-lg font-semibold text-gray-900">最新行情</h2>

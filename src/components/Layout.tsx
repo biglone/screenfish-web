@@ -14,6 +14,8 @@ import {
   Menu,
   X,
   Palette,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { useHealth, useVersion } from '../hooks/useApi';
 import { logout, useMe } from '../hooks/useAuth';
@@ -38,6 +40,8 @@ const navItems: Array<{
   { to: '/update', icon: RefreshCw, label: '数据更新', adminOnly: true },
 ];
 
+const SIDEBAR_COLLAPSED_KEY = 'screenfish_sidebar_collapsed';
+
 export function Layout() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -48,6 +52,13 @@ export function Layout() {
   const me = useMe(authEnabled);
   const isAdmin = !authEnabled || me.data?.role === 'admin';
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
 
   const webVersion =
     String(import.meta.env.VITE_APP_VERSION ?? import.meta.env.VITE_BUILD_SHA ?? '').trim() || 'dev';
@@ -72,6 +83,14 @@ export function Layout() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [mobileNavOpen]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, sidebarCollapsed ? '1' : '0');
+    } catch {
+      // ignore
+    }
+  }, [sidebarCollapsed]);
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -102,17 +121,32 @@ export function Layout() {
       <div className="flex min-h-screen">
         {/* Sidebar / Drawer */}
         <aside
-          className={`fixed left-0 top-0 z-50 h-screen w-64 max-w-[80vw] bg-gray-900 transition-transform xl:z-40 xl:translate-x-0 ${
+          className={`fixed left-0 top-0 z-50 h-screen w-64 max-w-[80vw] bg-gray-900 transition-all xl:z-40 xl:translate-x-0 ${
             mobileNavOpen ? 'translate-x-0' : '-translate-x-full'
-          }`}
+          } ${sidebarCollapsed ? 'xl:w-20' : 'xl:w-64'}`}
         >
         <div className="flex h-full flex-col">
           {/* Logo */}
-          <div className="flex h-14 items-center justify-between gap-3 border-b border-gray-800 px-4 lg:h-16 lg:px-6">
-            <div className="flex items-center gap-3">
+          <div
+            className={`flex h-14 items-center justify-between gap-3 border-b border-gray-800 px-4 lg:h-16 lg:px-6 ${
+              sidebarCollapsed ? 'xl:px-3' : ''
+            }`}
+          >
+            <div className={`flex items-center gap-3 ${sidebarCollapsed ? 'xl:justify-center' : ''}`}>
               <Fish className="h-8 w-8 text-[color:var(--sf-primary-400)]" />
-              <span className="text-xl font-bold text-white">ScreenFish</span>
+              <span className={`text-xl font-bold text-white ${sidebarCollapsed ? 'xl:hidden' : ''}`}>
+                ScreenFish
+              </span>
             </div>
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed((v) => !v)}
+              aria-label={sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}
+              className="hidden items-center justify-center rounded-md border border-gray-800 bg-gray-900 p-2 text-gray-200 hover:bg-gray-800 xl:inline-flex"
+              title={sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}
+            >
+              {sidebarCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
+            </button>
             <button
               type="button"
               onClick={() => setMobileNavOpen(false)}
@@ -124,29 +158,30 @@ export function Layout() {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 space-y-1 px-3 py-4">
+          <nav className={`flex-1 space-y-1 px-3 py-4 ${sidebarCollapsed ? 'xl:px-2' : ''}`}>
             {visibleItems.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 onClick={() => setMobileNavOpen(false)}
+                title={item.label}
                 className={({ isActive }) =>
                   `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                     isActive
                       ? 'bg-[color:var(--sf-primary-600)] text-white'
                       : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-                  }`
+                  } ${sidebarCollapsed ? 'xl:justify-center xl:px-2' : ''}`
                 }
               >
-                <item.icon className="h-5 w-5" />
-                {item.label}
+                <item.icon className={`h-5 w-5 ${sidebarCollapsed ? 'xl:h-6 xl:w-6' : ''}`} />
+                <span className={sidebarCollapsed ? 'xl:hidden' : ''}>{item.label}</span>
               </NavLink>
             ))}
           </nav>
 
           {/* Footer */}
           <div className="border-t border-gray-800 p-4">
-            <div className="space-y-3">
+            <div className={`space-y-3 ${sidebarCollapsed ? 'xl:hidden' : ''}`}>
               <div>
                 <div className="mb-1 flex items-center justify-between">
                   <div className="flex items-center gap-2 text-xs font-semibold text-gray-400">
@@ -190,12 +225,21 @@ export function Layout() {
                 {apiVersion ? ` · API ${apiVersion}` : ''}
               </div>
             </div>
+            <div className={`hidden items-center justify-center xl:flex ${sidebarCollapsed ? '' : 'xl:hidden'}`}>
+              <div className="text-[10px] text-gray-400" title={`Web ${webVersion}${apiVersion ? ` · API ${apiVersion}` : ''}`}>
+                {webVersion}
+              </div>
+            </div>
           </div>
         </div>
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 p-4 pt-16 sm:p-6 sm:pt-16 xl:ml-64 xl:p-8 xl:pt-8">
+        <main
+          className={`flex-1 p-4 pt-16 sm:p-6 sm:pt-16 xl:p-8 xl:pt-8 ${
+            sidebarCollapsed ? 'xl:ml-20' : 'xl:ml-64'
+          }`}
+        >
         <Suspense
           fallback={
             <div className="flex justify-center py-16">
