@@ -38,11 +38,55 @@ const DEFAULT_VISIBLE_BARS: Record<KlineTimeframe, number> = {
   Y: 20,
 };
 
+const PANEL_VISIBLE_BARS_STORAGE_KEY = 'screenfish_panel_kline_visible_bars_v1';
+
 const PRICE_ADJUST_LABEL: Record<PriceAdjustMode, string> = {
   none: '不复权',
   qfq: '前复权',
   hfq: '后复权',
 };
+
+function clampInt(value: number, min: number, max: number, fallback: number) {
+  if (!Number.isFinite(value)) return fallback;
+  const v = Math.round(value);
+  if (!Number.isFinite(v)) return fallback;
+  if (v < min) return min;
+  if (v > max) return max;
+  return v;
+}
+
+function visibleBarsFromLogicalRange(range: LogicalRange | null): number | null {
+  if (!range) return null;
+  if (!Number.isFinite(range.from) || !Number.isFinite(range.to)) return null;
+  const len = range.to - range.from;
+  if (!Number.isFinite(len) || len <= 0) return null;
+  return Math.round(len);
+}
+
+function loadPanelVisibleBars(): Record<KlineTimeframe, number> {
+  const out: Record<KlineTimeframe, number> = { ...DEFAULT_VISIBLE_BARS };
+  if (typeof window === 'undefined') return out;
+  try {
+    const raw = localStorage.getItem(PANEL_VISIBLE_BARS_STORAGE_KEY);
+    if (!raw) return out;
+    const parsed = JSON.parse(raw) as Partial<Record<KlineTimeframe, unknown>>;
+    out.D = clampInt(Number(parsed.D), 20, MAX_DAILY_BARS, out.D);
+    out.M = clampInt(Number(parsed.M), 10, MAX_DAILY_BARS, out.M);
+    out.Y = clampInt(Number(parsed.Y), 5, MAX_DAILY_BARS, out.Y);
+  } catch {
+    // ignore
+  }
+  return out;
+}
+
+function persistPanelVisibleBars(value: Record<KlineTimeframe, number>) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(PANEL_VISIBLE_BARS_STORAGE_KEY, JSON.stringify(value));
+  } catch {
+    // ignore
+  }
+}
 
 interface HoverData {
   bar: DailyBar;
@@ -215,6 +259,9 @@ export function StockDetail({ tsCode, priceAdjust = 'qfq', variant = 'page', onC
 
   const isPanel = variant === 'panel';
   const priceAdjustLabel = PRICE_ADJUST_LABEL[priceAdjust] ?? priceAdjust;
+  const initialPanelVisibleBars = useMemo(() => loadPanelVisibleBars(), []);
+  const panelVisibleBarsRef = useRef<Record<KlineTimeframe, number>>(initialPanelVisibleBars);
+  const lastPersistPanelVisibleBarsAtRef = useRef<number>(0);
 
   const setChartHeightSafe = useCallback((height: number) => {
     chartHeightRef.current = height;
@@ -551,11 +598,13 @@ export function StockDetail({ tsCode, priceAdjust = 'qfq', variant = 'page', onC
 
     if (displayBars.length > 0) {
       const to = displayBars.length;
-      const from = Math.max(0, to - DEFAULT_VISIBLE_BARS[timeframe]);
+      const fallback = DEFAULT_VISIBLE_BARS[timeframe];
+      const visibleBars = isPanel ? (panelVisibleBarsRef.current[timeframe] ?? fallback) : fallback;
+      const from = Math.max(0, to - visibleBars);
       chart.timeScale().setVisibleLogicalRange({ from, to });
       appliedInitialViewKeyRef.current = viewKey;
     }
-  }, [displayBars, timeframe, tsCodeNormalized]);
+  }, [displayBars, isPanel, timeframe, tsCodeNormalized]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -565,6 +614,20 @@ export function StockDetail({ tsCode, priceAdjust = 'qfq', variant = 'page', onC
 
     const onVisibleRangeChange = (range: LogicalRange | null) => {
       if (!range) return;
+      if (isPanel) {
+        const visibleBars = visibleBarsFromLogicalRange(range);
+        if (visibleBars !== null) {
+          panelVisibleBarsRef.current = {
+            ...panelVisibleBarsRef.current,
+            [timeframe]: clampInt(visibleBars, 5, MAX_DAILY_BARS, DEFAULT_VISIBLE_BARS[timeframe]),
+          };
+          const now = Date.now();
+          if (now - lastPersistPanelVisibleBarsAtRef.current > 1000) {
+            lastPersistPanelVisibleBarsAtRef.current = now;
+            persistPanelVisibleBars(panelVisibleBarsRef.current);
+          }
+        }
+      }
       if (!dailyQuery.hasNextPage) return;
       if (dailyQuery.isFetchingNextPage) return;
       if (fetchMoreInFlightRef.current) return;
@@ -580,7 +643,7 @@ export function StockDetail({ tsCode, priceAdjust = 'qfq', variant = 'page', onC
     return () => {
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(onVisibleRangeChange);
     };
-  }, [dailyQuery.fetchNextPage, dailyQuery.hasNextPage, dailyQuery.isFetchingNextPage, timeframe]);
+  }, [dailyQuery.fetchNextPage, dailyQuery.hasNextPage, dailyQuery.isFetchingNextPage, isPanel, timeframe]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -936,7 +999,13 @@ export function StockDetail({ tsCode, priceAdjust = 'qfq', variant = 'page', onC
                 if (!chart) return;
                 const to = displayBars.length;
                 if (!to) return;
-                const from = Math.max(0, to - DEFAULT_VISIBLE_BARS[timeframe]);
+                const range = chart.timeScale().getVisibleLogicalRange();
+                const currentVisibleBars = visibleBarsFromLogicalRange(range);
+                const fallback = DEFAULT_VISIBLE_BARS[timeframe];
+                const visibleBars =
+                  currentVisibleBars ??
+                  (isPanel ? (panelVisibleBarsRef.current[timeframe] ?? fallback) : fallback);
+                const from = Math.max(0, to - visibleBars);
                 chart.timeScale().setVisibleLogicalRange({ from, to });
               }}
               className="inline-flex h-9 items-center gap-1 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700 shadow-sm hover:bg-gray-50"
