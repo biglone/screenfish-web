@@ -249,7 +249,7 @@ class StockScreenerApi {
 
   async getStockDaily(
     tsCode: string,
-    params?: { start?: string; end?: string; limit?: number }
+    params?: { start?: string; end?: string; limit?: number; price_adjust?: 'none' | 'qfq' | 'hfq' }
   ): Promise<StockDailyResponse> {
     const { data } = await this.client.get<StockDailyResponse>(
       `/v1/stocks/${encodeURIComponent(tsCode)}/daily`,
@@ -311,7 +311,7 @@ class StockScreenerApi {
   async getIndicatorSeries(
     tsCode: string,
     formulaId: number,
-    params?: { start?: string; end?: string; limit?: number }
+    params?: { start?: string; end?: string; limit?: number; price_adjust?: 'none' | 'qfq' | 'hfq' }
   ): Promise<IndicatorSeriesResponse> {
     const { data } = await this.client.get<IndicatorSeriesResponse>(
       `/v1/stocks/${encodeURIComponent(tsCode)}/indicators/${formulaId}`,

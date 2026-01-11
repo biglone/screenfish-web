@@ -60,6 +60,7 @@ export interface ScreenRequest {
   lookback_days?: number;
   rules?: string | null;
   with_name?: boolean;
+  price_adjust?: 'none' | 'qfq' | 'hfq' | null;
 }
 
 export interface ScreenHit {

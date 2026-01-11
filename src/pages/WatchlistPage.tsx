@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Download, Plus, Pencil, Trash2, Search, X } from 'lucide-react';
 import api from '../api/client';
 import { useWatchlist } from '../hooks/useWatchlist';
+import { usePriceAdjust } from '../hooks/usePriceAdjust';
 import { StockDetail } from '../components/StockDetail';
 import type { StockItem } from '../types/api';
 
@@ -45,6 +46,7 @@ const RESIZER_STEP_PX = 24;
 export function WatchlistPage() {
   const { groups, createGroup, renameGroup, deleteGroup, upsertItem, removeItems } =
     useWatchlist();
+  const [priceAdjust] = usePriceAdjust();
 
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [activeTsCode, setActiveTsCode] = useState<string | null>(null);
@@ -620,6 +622,7 @@ export function WatchlistPage() {
             {resolvedActiveTsCode ? (
               <StockDetail
                 tsCode={resolvedActiveTsCode}
+                priceAdjust={priceAdjust}
                 variant="panel"
                 onClose={() => {
                   setActiveTsCode(null);

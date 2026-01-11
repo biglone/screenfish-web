@@ -17,6 +17,7 @@ import {
 } from 'lightweight-charts';
 import api from '../api/client';
 import type { DailyBar, IndicatorPoint } from '../types/api';
+import type { PriceAdjustMode } from '../hooks/usePriceAdjust';
 
 const CHART_HEIGHT = 500;
 const SUB_PANE_HEIGHT = 0.2;
@@ -53,6 +54,7 @@ export type StockDetailVariant = 'page' | 'panel';
 
 export type StockDetailProps = {
   tsCode: string;
+  priceAdjust?: PriceAdjustMode;
   variant?: StockDetailVariant;
   onClose?: () => void;
 };
@@ -182,7 +184,7 @@ function calcKdj(bars: DailyBar[], n = 9, m1 = 3, m2 = 3) {
   return { k, d, j };
 }
 
-export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailProps) {
+export function StockDetail({ tsCode, priceAdjust = 'qfq', variant = 'page', onClose }: StockDetailProps) {
   const tsCodeNormalized = tsCode.trim();
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -215,9 +217,9 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
   }, [tsCodeNormalized]);
 
   const dailyQuery = useInfiniteQuery({
-    queryKey: ['stock-daily', tsCodeNormalized],
+    queryKey: ['stock-daily', tsCodeNormalized, priceAdjust],
     queryFn: ({ pageParam }: { pageParam: string | undefined }) =>
-      api.getStockDaily(tsCodeNormalized, { end: pageParam, limit: DAILY_PAGE_SIZE }),
+      api.getStockDaily(tsCodeNormalized, { end: pageParam, limit: DAILY_PAGE_SIZE, price_adjust: priceAdjust }),
     initialPageParam: undefined,
     getNextPageParam: (lastPage, allPages) => {
       const total = allPages.reduce((acc, p) => acc + p.bars.length, 0);
@@ -282,9 +284,9 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
     isLoading: indicatorSeriesLoading,
     error: indicatorSeriesError,
   } = useQuery({
-    queryKey: ['indicator-series', tsCodeNormalized, selectedIndicatorId, indicatorLimit],
+    queryKey: ['indicator-series', tsCodeNormalized, selectedIndicatorId, indicatorLimit, priceAdjust],
     queryFn: () =>
-      api.getIndicatorSeries(tsCodeNormalized, selectedIndicatorId!, { limit: indicatorLimit }),
+      api.getIndicatorSeries(tsCodeNormalized, selectedIndicatorId!, { limit: indicatorLimit, price_adjust: priceAdjust }),
     enabled: !!tsCodeNormalized && selectedIndicatorId !== null && indicatorLimit > 0,
     placeholderData: keepPreviousData,
   });
@@ -713,7 +715,7 @@ export function StockDetail({ tsCode, variant = 'page', onClose }: StockDetailPr
           </div>
           <div className="flex flex-shrink-0 items-center gap-2">
             <Link
-              to={`/stocks/${encodeURIComponent(tsCodeNormalized)}`}
+              to={`/stocks/${encodeURIComponent(tsCodeNormalized)}?price_adjust=${encodeURIComponent(priceAdjust)}`}
               className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-700 hover:bg-gray-50"
               title="在新页面打开"
             >

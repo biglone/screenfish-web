@@ -3,6 +3,7 @@ import { useEffect, useMemo } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { StockDetail } from '../components/StockDetail';
 import api from '../api/client';
+import { usePriceAdjust, type PriceAdjustMode } from '../hooks/usePriceAdjust';
 
 export function StockDetailPage() {
   const { tsCode } = useParams<{ tsCode: string }>();
@@ -11,6 +12,14 @@ export function StockDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const tsCodeNormalized = tsCode.trim();
+  const [priceAdjust] = usePriceAdjust();
+
+  const priceAdjustEffective = useMemo<PriceAdjustMode>(() => {
+    const params = new URLSearchParams(location.search);
+    const raw = (params.get('price_adjust') ?? '').trim().toLowerCase();
+    if (raw === 'none' || raw === 'qfq' || raw === 'hfq') return raw;
+    return priceAdjust;
+  }, [location.search, priceAdjust]);
 
   const stocksContext = useMemo(() => {
     const params = new URLSearchParams(location.search);
@@ -91,5 +100,5 @@ export function StockDetailPage() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [location.search, navigate, siblings.next, siblings.prev, stocksContext]);
 
-  return <StockDetail tsCode={tsCodeNormalized} variant="page" />;
+  return <StockDetail tsCode={tsCodeNormalized} priceAdjust={priceAdjustEffective} variant="page" />;
 }

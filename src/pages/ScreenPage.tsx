@@ -5,6 +5,7 @@ import api from '../api/client';
 import type { ScreenRequest, ScreenHit, WatchlistItem } from '../types/api';
 import { StockDetail } from '../components/StockDetail';
 import { useWatchlist } from '../hooks/useWatchlist';
+import { usePriceAdjust, type PriceAdjustMode } from '../hooks/usePriceAdjust';
 import {
   Search,
   Download,
@@ -18,6 +19,7 @@ import {
 import { Link } from 'react-router-dom';
 
 export function ScreenPage() {
+  const [priceAdjust, setPriceAdjust] = usePriceAdjust();
   const [formData, setFormData] = useState<ScreenRequest>({
     date: 'latest',
     combo: 'and',
@@ -135,7 +137,7 @@ export function ScreenPage() {
       selectedFormulas.size > 0
         ? Array.from(selectedFormulas).join(',')
         : null;
-    screenMutation.mutate({ ...formData, rules });
+    screenMutation.mutate({ ...formData, rules, price_adjust: priceAdjust });
   };
 
   const handleExport = () => {
@@ -144,7 +146,7 @@ export function ScreenPage() {
         ? Array.from(selectedFormulas).join(',')
         : null;
     exportMutation.mutate(
-      { ...formData, rules },
+      { ...formData, rules, price_adjust: priceAdjust },
       {
         onSuccess: (data) => {
           const blob = new Blob([data.ebk], { type: 'text/plain;charset=utf-8' });
@@ -322,7 +324,7 @@ export function ScreenPage() {
       {/* Filter Options */}
       <div className="rounded-lg bg-white p-6 shadow">
         <h2 className="mb-4 text-lg font-semibold text-gray-900">筛选选项</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">
               筛选日期
@@ -349,6 +351,21 @@ export function ScreenPage() {
 	            >
               <option value="and">AND（全部满足）</option>
               <option value="or">OR（任一满足）</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              复权模式
+            </label>
+            <select
+              value={priceAdjust}
+              onChange={(e) => setPriceAdjust(e.target.value as PriceAdjustMode)}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+            >
+              <option value="qfq">前复权（QFQ）</option>
+              <option value="none">不复权</option>
+              <option value="hfq">后复权（HFQ）</option>
             </select>
           </div>
 
@@ -567,7 +584,7 @@ export function ScreenPage() {
                             </button>
 
 	                            <Link
-	                              to={`/stocks/${encodeURIComponent(hit.ts_code)}`}
+	                              to={`/stocks/${encodeURIComponent(hit.ts_code)}?price_adjust=${encodeURIComponent(priceAdjust)}`}
 	                              className="flex-shrink-0 text-sm text-[color:var(--sf-primary-600)] hover:text-[color:var(--sf-primary-800)]"
 	                              title="在新页面打开"
 	                            >
@@ -589,6 +606,7 @@ export function ScreenPage() {
               {activeTsCode ? (
                 <StockDetail
                   tsCode={activeTsCode}
+                  priceAdjust={priceAdjust}
                   variant="panel"
                   onClose={() => setActiveTsCode(null)}
                 />

@@ -3,12 +3,14 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import api from '../api/client';
+import { usePriceAdjust } from '../hooks/usePriceAdjust';
 
 const PAGE_SIZE = 50;
 
 const preloadStockDetailPage = () => import('./StockDetailPage');
 
 export function StocksPage() {
+  const [priceAdjust] = usePriceAdjust();
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [page, setPage] = useState(0);
@@ -16,12 +18,13 @@ export function StocksPage() {
   const stockDetailQuery = useMemo(() => {
     const params = new URLSearchParams();
     params.set('from', 'stocks');
+    params.set('price_adjust', priceAdjust);
     if (search) params.set('search', search);
     params.set('page', String(page));
     params.set('limit', String(PAGE_SIZE));
     const qs = params.toString();
     return qs ? `?${qs}` : '';
-  }, [page, search]);
+  }, [page, priceAdjust, search]);
 
   const { data, isLoading, isFetching, error } = useQuery({
     queryKey: ['stocks', search, page],
