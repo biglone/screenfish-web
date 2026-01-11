@@ -82,6 +82,38 @@ export interface AvailabilityResponse {
   detail: string;
 }
 
+export interface DataIntegrityCount {
+  trade_date: string;
+  rows: number;
+}
+
+export interface DataIntegrityResponse {
+  ok: boolean;
+  provider: 'baostock' | 'tushare';
+  price_adjust: 'none' | 'qfq' | 'hfq';
+  requested_date: string;
+  target_date: string;
+  lookback_days: number;
+  range_start: string;
+  range_end: string;
+  open_trade_dates: number;
+  max_daily_trade_date: string | null;
+  max_update_log_trade_date: string | null;
+  missing_update_log_count: number;
+  missing_update_log_dates: string[];
+  missing_daily_count: number;
+  missing_daily_dates: string[];
+  daily_rows_min: number | null;
+  daily_rows_median: number | null;
+  daily_rows_max: number | null;
+  suspicious_daily_count: number;
+  suspicious_daily_dates: DataIntegrityCount[];
+  market_stock_basic: Record<string, number>;
+  market_daily_rows_on_target_date: Record<string, number>;
+  missing_market_daily_count: Record<string, number>;
+  missing_market_daily_dates: Record<string, string[]>;
+}
+
 export interface ExportEbkResponse {
   trade_date: string;
   ebk: string;

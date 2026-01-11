@@ -9,6 +9,7 @@ import type {
   ScreenRequest,
   ScreenResponse,
   AvailabilityResponse,
+  DataIntegrityResponse,
   ExportEbkResponse,
   HealthResponse,
   VersionResponse,
@@ -230,6 +231,17 @@ class StockScreenerApi {
     const { data } = await this.client.get<AvailabilityResponse>('/v1/data/availability', {
       params: { date, provider },
     });
+    return data;
+  }
+
+  async dataIntegrity(params?: {
+    provider?: 'baostock' | 'tushare';
+    date?: string;
+    lookback_days?: number;
+    suspicious_ratio?: number;
+    price_adjust?: 'none' | 'qfq' | 'hfq';
+  }): Promise<DataIntegrityResponse> {
+    const { data } = await this.client.get<DataIntegrityResponse>('/v1/data/integrity', { params });
     return data;
   }
 

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../api/client';
 import type {
   AutoUpdateConfig,
+  DataIntegrityResponse,
   UpdateRequest,
   UpdateWaitRequest,
   UpdateWaitResponse,
@@ -14,6 +15,21 @@ export const queryKeys = {
   version: ['version'] as const,
   status: ['status'] as const,
   autoUpdateConfig: ['autoUpdateConfig'] as const,
+  dataIntegrity: (params: {
+    provider?: 'baostock' | 'tushare';
+    date?: string;
+    lookback_days?: number;
+    suspicious_ratio?: number;
+    price_adjust?: 'none' | 'qfq' | 'hfq';
+  }) =>
+    [
+      'dataIntegrity',
+      params.provider ?? 'baostock',
+      params.date ?? 'latest',
+      params.lookback_days ?? 60,
+      params.suspicious_ratio ?? 0.8,
+      params.price_adjust ?? null,
+    ] as const,
   screen: (params: ScreenRequest) => ['screen', params] as const,
   availability: (date: string, provider: string) => ['availability', date, provider] as const,
   updateWaitJob: (jobId: string) => ['updateWaitJob', jobId] as const,
@@ -136,6 +152,25 @@ export function useAvailability(
     queryKey: queryKeys.availability(date, provider),
     queryFn: () => api.availability(date, provider),
     enabled,
+  });
+}
+
+export function useDataIntegrity(
+  params: {
+    provider?: 'baostock' | 'tushare';
+    date?: string;
+    lookback_days?: number;
+    suspicious_ratio?: number;
+    price_adjust?: 'none' | 'qfq' | 'hfq';
+  },
+  enabled = true
+) {
+  return useQuery<DataIntegrityResponse>({
+    queryKey: queryKeys.dataIntegrity(params),
+    queryFn: () => api.dataIntegrity(params),
+    enabled,
+    retry: false,
+    refetchInterval: 60000,
   });
 }
 

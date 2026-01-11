@@ -52,6 +52,10 @@ const LogsPage = lazy(async () => {
   const mod = await import('./pages/LogsPage');
   return { default: mod.LogsPage };
 });
+const DataIntegrityPage = lazy(async () => {
+  const mod = await import('./pages/DataIntegrityPage');
+  return { default: mod.DataIntegrityPage };
+});
 const AuthPage = lazy(async () => {
   const mod = await import('./pages/AuthPage');
   return { default: mod.AuthPage };
@@ -90,6 +94,7 @@ function App() {
             <Route path="users" element={<UsersPage />} />
             <Route path="logs" element={<LogsPage />} />
             <Route path="update" element={<UpdatePage />} />
+            <Route path="integrity" element={<DataIntegrityPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

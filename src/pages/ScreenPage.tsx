@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useScreenMutation, useExportEbk } from '../hooks/useApi';
+import { useDataIntegrity, useScreenMutation, useExportEbk } from '../hooks/useApi';
 import api from '../api/client';
 import type { ScreenRequest, ScreenHit, WatchlistItem } from '../types/api';
 import { StockDetail } from '../components/StockDetail';
@@ -49,6 +49,19 @@ export function ScreenPage() {
 
   const enabledFormulas = formulasData?.formulas ?? [];
   const hits = screenMutation.data?.hits ?? [];
+
+  const dateForIntegrity = String(formData.date ?? 'latest').trim() || 'latest';
+  const canCheckIntegrity = dateForIntegrity === 'latest' || /^\d{8}$/.test(dateForIntegrity);
+  const integrityQuery = useDataIntegrity(
+    {
+      provider: 'baostock',
+      date: dateForIntegrity,
+      lookback_days: Math.min(Math.max(0, formData.lookback_days ?? 200), 60),
+      suspicious_ratio: 0.8,
+      price_adjust: priceAdjust,
+    },
+    canCheckIntegrity
+  );
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -138,6 +151,10 @@ export function ScreenPage() {
       selectedFormulas.size > 0
         ? Array.from(selectedFormulas).join(',')
         : null;
+    if (integrityQuery.data && !integrityQuery.data.ok) {
+      const msg = `数据可能不完整（缺失更新日志 ${integrityQuery.data.missing_update_log_count}，缺失日线 ${integrityQuery.data.missing_daily_count}，异常 ${integrityQuery.data.suspicious_daily_count}），仍要继续筛选？`;
+      if (!window.confirm(msg)) return;
+    }
     screenMutation.mutate({ ...formData, rules, price_adjust: priceAdjust });
   };
 
@@ -146,6 +163,10 @@ export function ScreenPage() {
       selectedFormulas.size > 0
         ? Array.from(selectedFormulas).join(',')
         : null;
+    if (integrityQuery.data && !integrityQuery.data.ok) {
+      const msg = `数据可能不完整（缺失更新日志 ${integrityQuery.data.missing_update_log_count}，缺失日线 ${integrityQuery.data.missing_daily_count}，异常 ${integrityQuery.data.suspicious_daily_count}），仍要继续导出？`;
+      if (!window.confirm(msg)) return;
+    }
     exportMutation.mutate(
       { ...formData, rules, price_adjust: priceAdjust },
       {
@@ -238,6 +259,46 @@ export function ScreenPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">股票筛选</h1>
       </div>
+
+      {!canCheckIntegrity ? (
+        <div className="rounded-lg bg-amber-50 p-4 text-sm text-amber-900">
+          数据完整性检查：日期格式不正确，无法检查（请输入 <span className="font-mono">latest</span> 或{' '}
+          <span className="font-mono">YYYYMMDD</span>）。
+        </div>
+      ) : integrityQuery.isLoading ? (
+        <div className="rounded-lg bg-[color:var(--sf-primary-50)] p-4 text-sm text-[color:var(--sf-primary-800)]">
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin text-[color:var(--sf-primary-600)]" />
+            数据完整性检查中...
+          </div>
+        </div>
+      ) : integrityQuery.data ? (
+        integrityQuery.data.ok ? (
+          <div className="rounded-lg bg-green-50 p-4 text-sm text-green-800">
+            数据完整性：OK（目标交易日 {formatDate(integrityQuery.data.target_date)}）
+            {integrityQuery.isFetching ? '（刷新中...）' : ''}。
+          </div>
+        ) : (
+          <div className="rounded-lg bg-amber-50 p-4 text-sm text-amber-900">
+            数据可能不完整（目标交易日 {formatDate(integrityQuery.data.target_date)}）：缺失更新日志{' '}
+            {integrityQuery.data.missing_update_log_count}，缺失日线 {integrityQuery.data.missing_daily_count}，异常{' '}
+            {integrityQuery.data.suspicious_daily_count}
+            {integrityQuery.isFetching ? '（刷新中...）' : ''}。建议先到{' '}
+            <Link to="/integrity" className="underline">
+              完整性检查
+            </Link>{' '}
+            或{' '}
+            <Link to="/update" className="underline">
+              数据更新
+            </Link>
+            。
+          </div>
+        )
+      ) : integrityQuery.error ? (
+        <div className="rounded-lg bg-amber-50 p-4 text-sm text-amber-900">
+          数据完整性检查失败：{(integrityQuery.error as Error).message}
+        </div>
+      ) : null}
 
       {/* Formula Selection */}
       <div className="rounded-lg bg-white p-6 shadow">
