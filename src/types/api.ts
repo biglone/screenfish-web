@@ -60,6 +60,7 @@ export interface ScreenRequest {
   lookback_days?: number;
   rules?: string | null;
   with_name?: boolean;
+  exclude_st?: boolean;
   price_adjust?: 'none' | 'qfq' | 'hfq' | null;
 }
 

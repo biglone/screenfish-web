@@ -26,6 +26,7 @@ export function ScreenPage() {
     lookback_days: 200,
     rules: null,
     with_name: true,
+    exclude_st: true,
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [selectedFormulas, setSelectedFormulas] = useState<Set<string>>(new Set());
@@ -382,6 +383,21 @@ export function ScreenPage() {
               )}
               高级选项
             </button>
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-6">
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="excludeSt"
+              checked={!!formData.exclude_st}
+              onChange={(e) => setFormData({ ...formData, exclude_st: e.target.checked })}
+              className="h-4 w-4 rounded border-gray-300 accent-[color:var(--sf-primary-600)] focus:ring-[color:var(--sf-primary-500)]"
+            />
+            <label htmlFor="excludeSt" className="ml-2 text-sm text-gray-700">
+              剔除ST股票
+            </label>
           </div>
         </div>
 
