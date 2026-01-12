@@ -6,6 +6,10 @@ import type {
   UpdateWaitRequest,
   UpdateWaitResponse,
   AutoUpdateConfig,
+  AutoScreenConfig,
+  AutoScreenConfigUpdate,
+  AutoScreenRunRequest,
+  AutoScreenRunResponse,
   ScreenRequest,
   ScreenResponse,
   AvailabilityResponse,
@@ -203,6 +207,21 @@ class StockScreenerApi {
 
   async updateAutoUpdateConfig(request: AutoUpdateConfig): Promise<AutoUpdateConfig> {
     const { data } = await this.client.put<AutoUpdateConfig>('/auto-update-config', request);
+    return data;
+  }
+
+  async getAutoScreenConfig(): Promise<AutoScreenConfig> {
+    const { data } = await this.client.get<AutoScreenConfig>('/auto-screen-config');
+    return data;
+  }
+
+  async updateAutoScreenConfig(request: AutoScreenConfigUpdate): Promise<AutoScreenConfig> {
+    const { data } = await this.client.put<AutoScreenConfig>('/auto-screen-config', request);
+    return data;
+  }
+
+  async runAutoScreen(request: AutoScreenRunRequest): Promise<AutoScreenRunResponse> {
+    const { data } = await this.client.post<AutoScreenRunResponse>('/v1/auto-screen/run', request);
     return data;
   }
 

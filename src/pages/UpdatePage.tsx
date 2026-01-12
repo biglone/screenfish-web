@@ -7,6 +7,9 @@ import {
   useStatus,
   useAutoUpdateConfig,
   useUpdateAutoUpdateConfig,
+  useAutoScreenConfig,
+  useUpdateAutoScreenConfig,
+  useRunAutoScreen,
   useAvailability,
   useHealth,
 } from '../hooks/useApi';
@@ -41,6 +44,20 @@ export function UpdatePage() {
   const [autoRepairDaysDraft, setAutoRepairDaysDraft] = useState<number | null>(null);
   const [autoSavedAt, setAutoSavedAt] = useState<number | null>(null);
 
+  const autoScreenConfigQuery = useAutoScreenConfig(isAdmin);
+  const updateAutoScreenConfigMutation = useUpdateAutoScreenConfig();
+  const runAutoScreenMutation = useRunAutoScreen();
+  const [screenEnabledDraft, setScreenEnabledDraft] = useState<boolean | null>(null);
+  const [screenGroupNameDraft, setScreenGroupNameDraft] = useState<string | null>(null);
+  const [screenComboDraft, setScreenComboDraft] = useState<'and' | 'or' | null>(null);
+  const [screenRulesDraft, setScreenRulesDraft] = useState<string | null>(null);
+  const [screenLookbackDaysDraft, setScreenLookbackDaysDraft] = useState<number | null>(null);
+  const [screenExcludeStDraft, setScreenExcludeStDraft] = useState<boolean | null>(null);
+  const [screenPriceAdjustDraft, setScreenPriceAdjustDraft] = useState<'none' | 'qfq' | 'hfq' | null>(null);
+  const [screenReplaceGroupDraft, setScreenReplaceGroupDraft] = useState<boolean | null>(null);
+  const [screenForceRun, setScreenForceRun] = useState(false);
+  const [screenSavedAt, setScreenSavedAt] = useState<number | null>(null);
+
   const autoEnabled = autoEnabledDraft ?? autoUpdateConfigQuery.data?.enabled ?? false;
   const autoIntervalMinutes =
     autoIntervalMinutesDraft ??
@@ -49,6 +66,16 @@ export function UpdatePage() {
       : 10);
   const autoProvider = autoProviderDraft ?? autoUpdateConfigQuery.data?.provider ?? 'baostock';
   const autoRepairDays = autoRepairDaysDraft ?? autoUpdateConfigQuery.data?.repair_days ?? 30;
+
+  const screenEnabled = screenEnabledDraft ?? autoScreenConfigQuery.data?.enabled ?? false;
+  const screenGroupName = screenGroupNameDraft ?? autoScreenConfigQuery.data?.group_name ?? '自动筛选';
+  const screenCombo = screenComboDraft ?? autoScreenConfigQuery.data?.combo ?? 'and';
+  const screenRules = screenRulesDraft ?? autoScreenConfigQuery.data?.rules ?? '';
+  const screenLookbackDays = screenLookbackDaysDraft ?? autoScreenConfigQuery.data?.lookback_days ?? 200;
+  const screenExcludeSt = screenExcludeStDraft ?? autoScreenConfigQuery.data?.exclude_st ?? true;
+  const screenPriceAdjust = screenPriceAdjustDraft ?? autoScreenConfigQuery.data?.price_adjust ?? 'qfq';
+  const screenReplaceGroup = screenReplaceGroupDraft ?? autoScreenConfigQuery.data?.replace_group ?? true;
+  const screenWithName = autoScreenConfigQuery.data?.with_name ?? false;
 
   const [mode, setMode] = useState<'normal' | 'wait'>('normal');
   const [waitJobId, setWaitJobId] = useState<string | null>(null);
@@ -122,6 +149,35 @@ export function UpdatePage() {
           setAutoRepairDaysDraft(null);
           setAutoIntervalMinutesDraft(null);
           setAutoSavedAt(Date.now());
+        },
+      }
+    );
+  };
+
+  const handleSaveAutoScreenConfig = () => {
+    updateAutoScreenConfigMutation.mutate(
+      {
+        enabled: screenEnabled,
+        group_name: screenGroupName,
+        combo: screenCombo,
+        rules: screenRules.trim() ? screenRules.trim() : null,
+        lookback_days: Math.max(0, Math.round(screenLookbackDays)),
+        with_name: screenWithName,
+        exclude_st: screenExcludeSt,
+        price_adjust: screenPriceAdjust,
+        replace_group: screenReplaceGroup,
+      },
+      {
+        onSuccess: () => {
+          setScreenEnabledDraft(null);
+          setScreenGroupNameDraft(null);
+          setScreenComboDraft(null);
+          setScreenRulesDraft(null);
+          setScreenLookbackDaysDraft(null);
+          setScreenExcludeStDraft(null);
+          setScreenPriceAdjustDraft(null);
+          setScreenReplaceGroupDraft(null);
+          setScreenSavedAt(Date.now());
         },
       }
     );
@@ -292,6 +348,215 @@ export function UpdatePage() {
               <div className="mt-3 text-xs text-green-700">
                 已保存（{new Date(autoSavedAt).toLocaleString()}）
               </div>
+            )}
+          </div>
+
+          <div className="rounded-lg bg-white p-6 shadow">
+            <h2 className="mb-4 text-lg font-semibold text-gray-900">自动筛选设置</h2>
+
+            {(autoScreenConfigQuery.isLoading || autoScreenConfigQuery.isFetching) && (
+              <div className="mb-4 flex items-center gap-2 text-sm text-gray-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                加载中...
+              </div>
+            )}
+
+            {autoScreenConfigQuery.error && (
+              <div className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                读取自动筛选配置失败：{(autoScreenConfigQuery.error as Error).message}
+              </div>
+            )}
+
+            {updateAutoScreenConfigMutation.error && (
+              <div className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                保存自动筛选配置失败：{(updateAutoScreenConfigMutation.error as Error).message}
+              </div>
+            )}
+
+            {runAutoScreenMutation.error && (
+              <div className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                执行自动筛选失败：{(runAutoScreenMutation.error as Error).message}
+              </div>
+            )}
+
+            {autoScreenConfigQuery.data?.last_error && (
+              <div className="mb-4 rounded-md bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
+                上次失败：{autoScreenConfigQuery.data.last_error}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">启用</label>
+                <label className="mt-2 flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={screenEnabled}
+                    onChange={(e) => setScreenEnabledDraft(e.target.checked)}
+                    disabled={!autoScreenConfigQuery.data || updateAutoScreenConfigMutation.isPending}
+                    className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
+                  />
+                  自动筛选（更新成功后执行）
+                </label>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">分组名称</label>
+                <input
+                  type="text"
+                  value={screenGroupName}
+                  onChange={(e) => setScreenGroupNameDraft(e.target.value)}
+                  disabled={!autoScreenConfigQuery.data || updateAutoScreenConfigMutation.isPending}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                />
+                <div className="mt-1 text-xs text-gray-500">自动写入到该分组（不存在则创建）</div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">赋权模式</label>
+                <select
+                  value={screenPriceAdjust}
+                  onChange={(e) => setScreenPriceAdjustDraft(e.target.value as 'none' | 'qfq' | 'hfq')}
+                  disabled={!autoScreenConfigQuery.data || updateAutoScreenConfigMutation.isPending}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                >
+                  <option value="qfq">前复权（qfq）</option>
+                  <option value="hfq">后复权（hfq）</option>
+                  <option value="none">不复权（none）</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">组合方式</label>
+                <select
+                  value={screenCombo}
+                  onChange={(e) => setScreenComboDraft(e.target.value as 'and' | 'or')}
+                  disabled={!autoScreenConfigQuery.data || updateAutoScreenConfigMutation.isPending}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                >
+                  <option value="and">AND（全部满足）</option>
+                  <option value="or">OR（满足任意）</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">回溯天数</label>
+                <input
+                  type="number"
+                  value={screenLookbackDays}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    setScreenLookbackDaysDraft(Number.isNaN(v) ? 200 : Math.max(0, v));
+                  }}
+                  disabled={!autoScreenConfigQuery.data || updateAutoScreenConfigMutation.isPending}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">选项</label>
+                <div className="mt-2 space-y-2 text-sm text-gray-700">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={screenExcludeSt}
+                      onChange={(e) => setScreenExcludeStDraft(e.target.checked)}
+                      disabled={!autoScreenConfigQuery.data || updateAutoScreenConfigMutation.isPending}
+                      className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
+                    />
+                    剔除 ST
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={screenReplaceGroup}
+                      onChange={(e) => setScreenReplaceGroupDraft(e.target.checked)}
+                      disabled={!autoScreenConfigQuery.data || updateAutoScreenConfigMutation.isPending}
+                      className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
+                    />
+                    覆盖分组（替换旧结果）
+                  </label>
+                </div>
+              </div>
+
+              <div className="sm:col-span-2 lg:col-span-3">
+                <label className="block text-sm font-medium text-gray-700">规则（逗号分隔）</label>
+                <textarea
+                  value={screenRules}
+                  onChange={(e) => setScreenRulesDraft(e.target.value)}
+                  rows={2}
+                  placeholder="例如：公式A,公式B（留空表示使用全部启用的公式；若无则使用内置规则）"
+                  disabled={!autoScreenConfigQuery.data || updateAutoScreenConfigMutation.isPending}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                />
+                <div className="mt-1 text-xs text-gray-500">
+                  规则会在保存时校验（内置规则如 midline_ma60/kdj_oversold 也可用）。
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">手动执行</label>
+                <label className="mt-2 flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={screenForceRun}
+                    onChange={(e) => setScreenForceRun(e.target.checked)}
+                    className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
+                  />
+                  强制重新筛选
+                </label>
+                <div className="mt-1 text-xs text-gray-500">用于验证/回测同一天结果</div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={handleSaveAutoScreenConfig}
+                disabled={!autoScreenConfigQuery.data || updateAutoScreenConfigMutation.isPending}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[color:var(--sf-primary-600)] px-4 py-2 text-white hover:bg-[color:var(--sf-primary-700)] disabled:bg-[color:var(--sf-primary-400)] sm:w-auto"
+              >
+                {updateAutoScreenConfigMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                保存配置
+              </button>
+
+              <button
+                type="button"
+                onClick={() => runAutoScreenMutation.mutate({ date: 'latest', force: screenForceRun })}
+                disabled={!autoScreenConfigQuery.data || runAutoScreenMutation.isPending}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50 disabled:bg-gray-100 sm:w-auto"
+              >
+                {runAutoScreenMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                立即执行一次
+              </button>
+            </div>
+
+            {screenSavedAt && (
+              <div className="mt-3 text-xs text-green-700">
+                已保存（{new Date(screenSavedAt).toLocaleString()}）
+              </div>
+            )}
+
+            {autoScreenConfigQuery.data && (
+              <div className="mt-4 text-xs text-gray-600">
+                上次执行：
+                {autoScreenConfigQuery.data.last_trade_date
+                  ? `${autoScreenConfigQuery.data.last_trade_date}（命中 ${autoScreenConfigQuery.data.last_count ?? 0}）`
+                  : '—'}
+                {autoScreenConfigQuery.data.group_id ? ` | 分组ID: ${autoScreenConfigQuery.data.group_id}` : ''}
+              </div>
+            )}
+
+            {runAutoScreenMutation.data?.message && (
+              <div className="mt-3 text-xs text-green-700">{runAutoScreenMutation.data.message}</div>
             )}
           </div>
 

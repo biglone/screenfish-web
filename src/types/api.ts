@@ -54,6 +54,50 @@ export interface AutoUpdateConfig {
   repair_days: number;
 }
 
+export interface AutoScreenConfig {
+  enabled: boolean;
+  group_name: string;
+  group_id?: string | null;
+  combo: 'and' | 'or';
+  rules?: string | null;
+  lookback_days: number;
+  with_name: boolean;
+  exclude_st: boolean;
+  price_adjust: 'none' | 'qfq' | 'hfq';
+  replace_group: boolean;
+  last_run_at?: number | null;
+  last_trade_date?: string | null;
+  last_count?: number | null;
+  last_error?: string | null;
+}
+
+export interface AutoScreenConfigUpdate {
+  enabled: boolean;
+  group_name: string;
+  combo: 'and' | 'or';
+  rules?: string | null;
+  lookback_days: number;
+  with_name: boolean;
+  exclude_st: boolean;
+  price_adjust: 'none' | 'qfq' | 'hfq';
+  replace_group: boolean;
+}
+
+export interface AutoScreenRunRequest {
+  date?: string;
+  force?: boolean;
+}
+
+export interface AutoScreenRunResponse {
+  ok: boolean;
+  trade_date: string;
+  count: number;
+  group_id: string;
+  group_name: string;
+  message: string;
+  last_error?: string | null;
+}
+
 export interface ScreenRequest {
   date?: string;
   combo?: 'and' | 'or';

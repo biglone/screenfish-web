@@ -2,6 +2,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../api/client';
 import type {
   AutoUpdateConfig,
+  AutoScreenConfig,
+  AutoScreenConfigUpdate,
+  AutoScreenRunRequest,
+  AutoScreenRunResponse,
   DataIntegrityResponse,
   UpdateRequest,
   UpdateWaitRequest,
@@ -15,6 +19,7 @@ export const queryKeys = {
   version: ['version'] as const,
   status: ['status'] as const,
   autoUpdateConfig: ['autoUpdateConfig'] as const,
+  autoScreenConfig: ['autoScreenConfig'] as const,
   dataIntegrity: (params: {
     provider?: 'baostock' | 'tushare';
     date?: string;
@@ -99,6 +104,37 @@ export function useUpdateAutoUpdateConfig() {
     mutationFn: (request: AutoUpdateConfig) => api.updateAutoUpdateConfig(request),
     onSuccess: (data) => {
       queryClient.setQueryData(queryKeys.autoUpdateConfig, data);
+    },
+  });
+}
+
+export function useAutoScreenConfig(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.autoScreenConfig,
+    queryFn: () => api.getAutoScreenConfig(),
+    enabled,
+    retry: false,
+  });
+}
+
+export function useUpdateAutoScreenConfig() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request: AutoScreenConfigUpdate) => api.updateAutoScreenConfig(request),
+    onSuccess: (data: AutoScreenConfig) => {
+      queryClient.setQueryData(queryKeys.autoScreenConfig, data);
+    },
+  });
+}
+
+export function useRunAutoScreen() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request: AutoScreenRunRequest) => api.runAutoScreen(request),
+    onSuccess: (data: AutoScreenRunResponse) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.autoScreenConfig });
+      queryClient.invalidateQueries({ queryKey: queryKeys.status });
+      return data;
     },
   });
 }
