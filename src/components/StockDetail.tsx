@@ -10,13 +10,14 @@ import {
   type CandlestickData,
   type IChartApi,
   type ISeriesApi,
+  type LineWidth,
   type LogicalRange,
   type LineData,
   type Time,
   type WhitespaceData,
 } from 'lightweight-charts';
 import api from '../api/client';
-import type { DailyBar, IndicatorPoint } from '../types/api';
+import type { DailyBar, IndicatorLine, IndicatorPoint } from '../types/api';
 import type { PriceAdjustMode } from '../hooks/usePriceAdjust';
 
 const CHART_HEIGHT = 500;
@@ -45,6 +46,41 @@ const PRICE_ADJUST_LABEL: Record<PriceAdjustMode, string> = {
   qfq: '前复权',
   hfq: '后复权',
 };
+
+const COLOR_WARNING = '#f59e0b';
+const COLOR_MUTED_LINE = '#9ca3af';
+const INDICATOR_COLOR_PALETTE = [
+  '#6366f1',
+  COLOR_WARNING,
+  '#10b981',
+  '#ef4444',
+  '#3b82f6',
+  '#a855f7',
+  '#14b8a6',
+];
+
+const KDJ_COLORS = {
+  k: COLOR_WARNING,
+  d: '#3b82f6',
+  j: '#ef4444',
+};
+
+function pickIndicatorLineStyle(lines: IndicatorLine[], index: number): { color: string; lineWidth: LineWidth } {
+  const line = lines[index];
+  const name = String(line?.name ?? '').trim();
+  const hasBullbear = lines.some((x) => String(x.name ?? '').includes('多空线'));
+  if (hasBullbear) {
+    const isBullbear = name.includes('多空线');
+    if (isBullbear) return { color: COLOR_WARNING, lineWidth: 2 };
+    if (lines.length === 2) return { color: COLOR_MUTED_LINE, lineWidth: 1 };
+  }
+  const looksLikeMa = /^MA\d*$/i.test(name) || name.toUpperCase().startsWith('MA');
+  if (looksLikeMa) return { color: COLOR_MUTED_LINE, lineWidth: 1 };
+  return {
+    color: INDICATOR_COLOR_PALETTE[index % INDICATOR_COLOR_PALETTE.length],
+    lineWidth: index === 0 ? 2 : 1,
+  };
+}
 
 function clampInt(value: number, min: number, max: number, fallback: number) {
   if (!Number.isFinite(value)) return fallback;
@@ -707,7 +743,7 @@ export function StockDetail({ tsCode, priceAdjust = 'qfq', variant = 'page', onC
     }
 
     if (showKdj && kdjLineSeriesRefs.current.length === 0) {
-      const colors = ['#f59e0b', '#3b82f6', '#ef4444'];
+      const colors = [KDJ_COLORS.k, KDJ_COLORS.d, KDJ_COLORS.j];
       for (const color of colors) {
         kdjLineSeriesRefs.current.push(
           chart.addSeries(LineSeries, {
@@ -789,12 +825,11 @@ export function StockDetail({ tsCode, priceAdjust = 'qfq', variant = 'page', onC
         ? indicatorSeriesData.lines
         : [{ name: indicatorSeriesData.name, points: indicatorSeriesData.points }];
 
-    const colors = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#3b82f6', '#a855f7', '#14b8a6'];
-
     for (const [index, line] of lines.entries()) {
+      const style = pickIndicatorLineStyle(lines, index);
       const s = chart.addSeries(LineSeries, {
-        color: colors[index % colors.length],
-        lineWidth: index === 0 ? 2 : 1,
+        color: style.color,
+        lineWidth: style.lineWidth,
         priceLineVisible: false,
       });
 
@@ -990,6 +1025,23 @@ export function StockDetail({ tsCode, priceAdjust = 'qfq', variant = 'page', onC
 	                />
 	                KDJ
 	              </label>
+
+            {showKdj && (
+              <div className="hidden items-center gap-3 text-xs text-gray-500 lg:flex" aria-label="KDJ 图例">
+                <span className="inline-flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: KDJ_COLORS.k }} />
+                  K
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: KDJ_COLORS.d }} />
+                  D
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: KDJ_COLORS.j }} />
+                  J
+                </span>
+              </div>
+            )}
 
             <span className="ml-2 text-sm text-gray-500">视图</span>
             <button
