@@ -49,6 +49,7 @@ const PRICE_ADJUST_LABEL: Record<PriceAdjustMode, string> = {
 
 const COLOR_WARNING = '#f59e0b';
 const COLOR_MUTED_LINE = '#9ca3af';
+const COLOR_BULLBEAR_LINE = '#6b7280';
 const INDICATOR_COLOR_PALETTE = [
   '#6366f1',
   COLOR_WARNING,
@@ -80,7 +81,7 @@ function pickIndicatorLineStyle(lines: IndicatorLine[], index: number): { color:
   const hasBullbear = lines.some((x) => String(x.name ?? '').includes('多空线'));
   if (hasBullbear) {
     const isBullbear = name.includes('多空线');
-    if (isBullbear) return { color: COLOR_WARNING, lineWidth: 2 };
+    if (isBullbear) return { color: COLOR_BULLBEAR_LINE, lineWidth: 1 };
     if (lines.length === 2) return { color: COLOR_MUTED_LINE, lineWidth: 1 };
   }
   const looksLikeMa = /^MA\d*$/i.test(name) || name.toUpperCase().startsWith('MA');
