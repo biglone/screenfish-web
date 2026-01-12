@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useDataIntegrity, useScreenMutation, useExportEbk } from '../hooks/useApi';
 import api from '../api/client';
@@ -19,6 +19,9 @@ import {
 import { Link } from 'react-router-dom';
 
 export function ScreenPage() {
+  const AUTO_RUN_STORAGE_KEY = 'screenfish_screen_auto_run';
+  const AUTO_RUN_ALLOW_INCOMPLETE_STORAGE_KEY = 'screenfish_screen_auto_run_allow_incomplete';
+
   const [priceAdjust, setPriceAdjust] = usePriceAdjust();
   const [formData, setFormData] = useState<ScreenRequest>({
     date: 'latest',
@@ -35,6 +38,21 @@ export function ScreenPage() {
   const [targetGroupId, setTargetGroupId] = useState<string>('');
   const [watchlistBusy, setWatchlistBusy] = useState(false);
   const [watchlistError, setWatchlistError] = useState<string | null>(null);
+  const [autoRun, setAutoRun] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(AUTO_RUN_STORAGE_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const [autoRunAllowIncomplete, setAutoRunAllowIncomplete] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(AUTO_RUN_ALLOW_INCOMPLETE_STORAGE_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const [autoRunPausedReason, setAutoRunPausedReason] = useState<string | null>(null);
 
   const { groups, createGroup, addItems } = useWatchlist();
 
@@ -54,8 +72,33 @@ export function ScreenPage() {
   const screenMutation = useScreenMutation();
   const exportMutation = useExportEbk();
 
+  const screenPendingRef = useRef(false);
+  const screenQueueRef = useRef<{ key: string; request: ScreenRequest } | null>(null);
+  const autoRunTimerRef = useRef<number | null>(null);
+  const lastAutoKeyRef = useRef<string | null>(null);
+
   const enabledFormulas = formulasData?.formulas ?? [];
   const hits = screenMutation.data?.hits ?? [];
+
+  useEffect(() => {
+    screenPendingRef.current = screenMutation.isPending;
+  }, [screenMutation.isPending]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(AUTO_RUN_STORAGE_KEY, autoRun ? '1' : '0');
+    } catch {
+      // ignore
+    }
+  }, [autoRun]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(AUTO_RUN_ALLOW_INCOMPLETE_STORAGE_KEY, autoRunAllowIncomplete ? '1' : '0');
+    } catch {
+      // ignore
+    }
+  }, [autoRunAllowIncomplete]);
 
   const availableTradeDates = tradeDatesQuery.data?.dates ?? [];
   const rawDate = String(formData.date ?? 'latest').trim() || 'latest';
@@ -76,6 +119,32 @@ export function ScreenPage() {
       price_adjust: priceAdjust,
     },
     canCheckIntegrity
+  );
+
+  const selectedRules = useMemo(() => {
+    if (selectedFormulas.size === 0) return '';
+    const arr = Array.from(selectedFormulas);
+    arr.sort();
+    return arr.join(',');
+  }, [selectedFormulas]);
+
+  const runScreenQueued = useCallback(
+    (item: { key: string; request: ScreenRequest }) => {
+      if (screenPendingRef.current) {
+        screenQueueRef.current = item;
+        return;
+      }
+      screenQueueRef.current = null;
+      screenPendingRef.current = true;
+      screenMutation.mutate(item.request, {
+        onSettled: () => {
+          screenPendingRef.current = false;
+          const next = screenQueueRef.current;
+          if (next) runScreenQueued(next);
+        },
+      });
+    },
+    [screenMutation]
   );
 
   useEffect(() => {
@@ -117,6 +186,61 @@ export function ScreenPage() {
     setSelectedHits(new Set());
     setActiveTsCode(screenMutation.data.hits[0]?.ts_code ?? null);
   }, [screenMutation.data]);
+
+  useEffect(() => {
+    if (!autoRun) {
+      setAutoRunPausedReason(null);
+      if (autoRunTimerRef.current) {
+        window.clearTimeout(autoRunTimerRef.current);
+        autoRunTimerRef.current = null;
+      }
+      return;
+    }
+    if (!selectedRules) return;
+
+    const ok = integrityQuery.data ? integrityQuery.data.ok : true;
+    if (!ok && !autoRunAllowIncomplete) {
+      setAutoRunPausedReason('数据可能不完整，已暂停自动筛选（可在下方勾选允许继续）');
+      return;
+    }
+    setAutoRunPausedReason(null);
+
+    const date = String(formData.date ?? 'latest').trim() || 'latest';
+    const combo = String(formData.combo ?? 'and');
+    const lookback = String(formData.lookback_days ?? 200);
+    const withName = formData.with_name ? '1' : '0';
+    const excludeSt = formData.exclude_st ? '1' : '0';
+    const adjust = priceAdjust;
+    const key = [date, combo, lookback, withName, excludeSt, selectedRules, adjust].join('|');
+
+    if (lastAutoKeyRef.current === key) return;
+
+    if (autoRunTimerRef.current) window.clearTimeout(autoRunTimerRef.current);
+    autoRunTimerRef.current = window.setTimeout(() => {
+      lastAutoKeyRef.current = key;
+      runScreenQueued({
+        key,
+        request: { ...formData, rules: selectedRules || null, price_adjust: priceAdjust },
+      });
+    }, 450);
+
+    return () => {
+      if (autoRunTimerRef.current) window.clearTimeout(autoRunTimerRef.current);
+    };
+  }, [
+    autoRun,
+    autoRunAllowIncomplete,
+    integrityQuery.data?.ok,
+    formData,
+    priceAdjust,
+    selectedRules,
+    runScreenQueued,
+  ]);
+
+  useEffect(() => {
+    if (!autoRun) return;
+    lastAutoKeyRef.current = null;
+  }, [autoRun]);
 
   const selectedHitItems = useMemo(() => {
     if (!screenMutation.data) return [];
@@ -161,23 +285,32 @@ export function ScreenPage() {
   };
 
   const handleScreen = () => {
-    // Build rules string from selected formulas
-    const rules =
-      selectedFormulas.size > 0
-        ? Array.from(selectedFormulas).join(',')
-        : null;
+    if (selectedFormulas.size === 0 && enabledFormulas.length > 0) return;
+
+    const date = String(formData.date ?? 'latest').trim() || 'latest';
+    const combo = String(formData.combo ?? 'and');
+    const lookback = String(formData.lookback_days ?? 200);
+    const withName = formData.with_name ? '1' : '0';
+    const excludeSt = formData.exclude_st ? '1' : '0';
+    const adjust = priceAdjust;
+    const key = [date, combo, lookback, withName, excludeSt, selectedRules, adjust].join('|');
+    const request = { ...formData, rules: selectedRules || null, price_adjust: priceAdjust };
+
     if (integrityQuery.data && !integrityQuery.data.ok) {
       const msg = `数据可能不完整（缺失更新日志 ${integrityQuery.data.missing_update_log_count}，缺失日线 ${integrityQuery.data.missing_daily_count}，异常 ${integrityQuery.data.suspicious_daily_count}），仍要继续筛选？`;
       if (!window.confirm(msg)) return;
     }
-    screenMutation.mutate({ ...formData, rules, price_adjust: priceAdjust });
+
+    if (autoRunTimerRef.current) {
+      window.clearTimeout(autoRunTimerRef.current);
+      autoRunTimerRef.current = null;
+    }
+    lastAutoKeyRef.current = key;
+    runScreenQueued({ key, request });
   };
 
   const handleExport = () => {
-    const rules =
-      selectedFormulas.size > 0
-        ? Array.from(selectedFormulas).join(',')
-        : null;
+    const rules = selectedRules ? selectedRules : null;
     if (integrityQuery.data && !integrityQuery.data.ok) {
       const msg = `数据可能不完整（缺失更新日志 ${integrityQuery.data.missing_update_log_count}，缺失日线 ${integrityQuery.data.missing_daily_count}，异常 ${integrityQuery.data.suspicious_daily_count}），仍要继续导出？`;
       if (!window.confirm(msg)) return;
@@ -550,18 +683,44 @@ export function ScreenPage() {
         )}
 
         {/* Actions */}
-        <div className="mt-6 flex gap-3">
-	          <button
-	            onClick={handleScreen}
-	            disabled={screenMutation.isPending || selectedFormulas.size === 0}
-	            className="inline-flex items-center gap-2 rounded-md bg-[color:var(--sf-primary-600)] px-4 py-2 text-white hover:bg-[color:var(--sf-primary-700)] disabled:bg-[color:var(--sf-primary-400)]"
-	          >
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 text-sm text-gray-700">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={autoRun}
+                onChange={(e) => setAutoRun(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 accent-[color:var(--sf-primary-600)] focus:ring-[color:var(--sf-primary-500)]"
+              />
+              配置变更后自动筛选（无需点按钮）
+            </label>
+
+            {autoRun && (
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={autoRunAllowIncomplete}
+                  onChange={(e) => setAutoRunAllowIncomplete(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 accent-[color:var(--sf-primary-600)] focus:ring-[color:var(--sf-primary-500)]"
+                />
+                数据不完整也自动筛选
+              </label>
+            )}
+
+            {autoRunPausedReason && <div className="text-xs text-amber-700">{autoRunPausedReason}</div>}
+          </div>
+
+          <button
+            onClick={handleScreen}
+            disabled={screenMutation.isPending || selectedFormulas.size === 0}
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-[color:var(--sf-primary-600)] px-4 py-2 text-white hover:bg-[color:var(--sf-primary-700)] disabled:bg-[color:var(--sf-primary-400)] sm:w-auto"
+          >
             {screenMutation.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Search className="h-4 w-4" />
             )}
-            开始筛选
+            手动筛选
           </button>
         </div>
 
