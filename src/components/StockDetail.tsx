@@ -1027,7 +1027,7 @@ export function StockDetail({ tsCode, priceAdjust = 'qfq', variant = 'page', onC
 	              </label>
 
             {showKdj && (
-              <div className="hidden items-center gap-3 text-xs text-gray-500 lg:flex" aria-label="KDJ 图例">
+              <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500" aria-label="KDJ 图例">
                 <span className="inline-flex items-center gap-1">
                   <span className="h-2 w-2 rounded-full" style={{ backgroundColor: KDJ_COLORS.k }} />
                   K
