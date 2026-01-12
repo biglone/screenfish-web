@@ -6,13 +6,11 @@ import api from '../api/client';
 import { usePriceAdjust, type PriceAdjustMode } from '../hooks/usePriceAdjust';
 
 export function StockDetailPage() {
-  const { tsCode } = useParams<{ tsCode: string }>();
-  if (!tsCode) return <div className="p-4 text-red-500">Invalid stock code</div>;
-
+  const params = useParams<{ tsCode: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const tsCodeNormalized = tsCode.trim();
   const [priceAdjust] = usePriceAdjust();
+  const tsCodeNormalized = (params.tsCode ?? '').trim();
 
   const priceAdjustEffective = useMemo<PriceAdjustMode>(() => {
     const params = new URLSearchParams(location.search);
@@ -100,5 +98,14 @@ export function StockDetailPage() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [location.search, navigate, siblings.next, siblings.prev, stocksContext]);
 
-  return <StockDetail tsCode={tsCodeNormalized} priceAdjust={priceAdjustEffective} variant="page" />;
+  if (!tsCodeNormalized) return <div className="p-4 text-red-500">Invalid stock code</div>;
+
+  return (
+    <StockDetail
+      key={tsCodeNormalized}
+      tsCode={tsCodeNormalized}
+      priceAdjust={priceAdjustEffective}
+      variant="page"
+    />
+  );
 }

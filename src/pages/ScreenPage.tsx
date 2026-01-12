@@ -733,6 +733,7 @@ export function ScreenPage() {
             <div className="rounded-lg border border-gray-200 bg-white p-4 shadow">
               {activeTsCode ? (
                 <StockDetail
+                  key={activeTsCode}
                   tsCode={activeTsCode}
                   priceAdjust={priceAdjust}
                   variant="panel"

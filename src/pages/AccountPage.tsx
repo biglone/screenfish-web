@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { KeyRound, Loader2, Mail, Save, User } from 'lucide-react';
 import api from '../api/client';
@@ -23,21 +23,17 @@ export function AccountPage() {
     retry: false,
   });
 
-  const [email, setEmail] = useState('');
-  const [emailInitialized, setEmailInitialized] = useState(false);
+  const [draftEmail, setDraftEmail] = useState<string | null>(null);
   const [emailPassword, setEmailPassword] = useState('');
   const [emailSavedAt, setEmailSavedAt] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (!accountQuery.data || emailInitialized) return;
-    setEmail(accountQuery.data.email ?? '');
-    setEmailInitialized(true);
-  }, [accountQuery.data, emailInitialized]);
+  const email = draftEmail ?? (accountQuery.data?.email ?? '');
 
   const updateAccount = useMutation({
     mutationFn: (req: { email: string | null; current_password: string }) => api.updateAccount(req),
     onSuccess: (data) => {
       queryClient.setQueryData(['account'], data);
+      setDraftEmail(null);
       setEmailPassword('');
       setEmailSavedAt(Date.now());
     },
@@ -65,7 +61,8 @@ export function AccountPage() {
 
   const normalizedEmail = email.trim();
   const emailPayload = normalizedEmail ? normalizedEmail : null;
-  const emailChanged = (accountQuery.data?.email ?? null) !== emailPayload;
+  const serverEmailPayload = (accountQuery.data?.email ?? null) || null;
+  const emailChanged = serverEmailPayload !== emailPayload;
 
   const passwordMismatch = newPassword.length > 0 && newPassword2.length > 0 && newPassword !== newPassword2;
   const passwordTooShort = newPassword.length > 0 && newPassword.length < 8;
@@ -124,7 +121,7 @@ export function AccountPage() {
                 <label className="block text-sm font-medium text-gray-700">邮箱</label>
                 <input
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => setDraftEmail(e.target.value)}
                   placeholder="name@example.com"
                   autoComplete="email"
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
@@ -234,4 +231,3 @@ export function AccountPage() {
     </div>
   );
 }
-

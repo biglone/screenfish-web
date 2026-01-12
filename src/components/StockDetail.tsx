@@ -68,6 +68,15 @@ const KDJ_COLORS = {
 function pickIndicatorLineStyle(lines: IndicatorLine[], index: number): { color: string; lineWidth: LineWidth } {
   const line = lines[index];
   const name = String(line?.name ?? '').trim();
+  const compactUpperName = name.replace(/\s+/g, '').toUpperCase();
+
+  if (compactUpperName === 'MA60' || compactUpperName === 'MA1') {
+    return { color: COLOR_WARNING, lineWidth: 1 };
+  }
+
+  if (compactUpperName === 'MA13' || compactUpperName === 'MA2' || compactUpperName === 'EMA13') {
+    return { color: COLOR_MUTED_LINE, lineWidth: 1 };
+  }
   const hasBullbear = lines.some((x) => String(x.name ?? '').includes('多空线'));
   if (hasBullbear) {
     const isBullbear = name.includes('多空线');
@@ -303,18 +312,6 @@ export function StockDetail({ tsCode, priceAdjust = 'qfq', variant = 'page', onC
     chartHeightRef.current = height;
     setChartHeight(height);
   }, []);
-
-  useEffect(() => {
-    // When switching to a different stock in the panel view, reset to sensible defaults.
-    setIndicatorSelection('auto');
-    setTimeframe('D');
-    setShowVolume(true);
-    setShowKdj(true);
-    setFullscreen(false);
-    setChartHeightSafe(CHART_HEIGHT);
-    setHoverData(null);
-    setModalData(null);
-  }, [setChartHeightSafe, tsCodeNormalized]);
 
   useEffect(() => {
     if (!fullscreen) return;

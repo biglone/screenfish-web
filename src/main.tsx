@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { applyStoredTheme } from './theme'
-import { ThemeProvider } from './hooks/useTheme'
+import { ThemeProvider } from './hooks/ThemeProvider'
 
 const build =
   String(

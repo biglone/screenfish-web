@@ -855,6 +855,7 @@ export function WatchlistPage() {
           <div className="rounded-lg border border-gray-200 bg-white p-4 shadow">
             {resolvedActiveTsCode ? (
               <StockDetail
+                key={resolvedActiveTsCode}
                 tsCode={resolvedActiveTsCode}
                 priceAdjust={priceAdjust}
                 variant="panel"
