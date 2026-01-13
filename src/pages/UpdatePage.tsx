@@ -77,7 +77,7 @@ export function UpdatePage() {
   const screenReplaceGroup = screenReplaceGroupDraft ?? autoScreenConfigQuery.data?.replace_group ?? true;
   const screenWithName = autoScreenConfigQuery.data?.with_name ?? false;
 
-  const [mode, setMode] = useState<'normal' | 'wait'>('normal');
+  const [mode, setMode] = useState<'normal' | 'wait'>('wait');
   const [waitJobId, setWaitJobId] = useState<string | null>(null);
   const [formData, setFormData] = useState<UpdateRequest>({
     provider: 'baostock',
@@ -349,6 +349,20 @@ export function UpdatePage() {
                 已保存（{new Date(autoSavedAt).toLocaleString()}）
               </div>
             )}
+
+            {autoUpdateConfigQuery.data && (
+              <div className="mt-4 text-xs text-gray-600">
+                <div>上次尝试：{formatTimestamp(autoUpdateConfigQuery.data.last_run_at)}</div>
+                <div>
+                  上次成功：{formatDate(autoUpdateConfigQuery.data.last_success_trade_date)}（{formatTimestamp(
+                    autoUpdateConfigQuery.data.last_success_at
+                  )}）
+                </div>
+                {autoUpdateConfigQuery.data.last_error && (
+                  <div className="mt-1 text-red-700">上次失败：{autoUpdateConfigQuery.data.last_error}</div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="rounded-lg bg-white p-6 shadow">
@@ -581,6 +595,9 @@ export function UpdatePage() {
 	                />
                 <span className="ml-2 text-sm text-gray-700">等待更新（轮询直到数据可用）</span>
               </label>
+            </div>
+            <div className="mt-2 text-xs text-gray-500">
+              推荐使用“等待更新”，避免普通更新耗时过长导致浏览器/Cloudflare 超时。
             </div>
           </div>
 
@@ -872,4 +889,9 @@ function formatDate(date: string | null | undefined): string {
     return `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;
   }
   return date;
+}
+
+function formatTimestamp(ts: number | null | undefined): string {
+  if (!ts || ts <= 0) return '-';
+  return new Date(ts * 1000).toLocaleString();
 }

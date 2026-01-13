@@ -52,6 +52,10 @@ export interface AutoUpdateConfig {
   interval_seconds: number;
   provider: 'baostock' | 'tushare';
   repair_days: number;
+  last_run_at?: number | null;
+  last_success_at?: number | null;
+  last_success_trade_date?: string | null;
+  last_error?: string | null;
 }
 
 export interface AutoScreenConfig {
