@@ -45,6 +45,11 @@ export interface UpdateWaitResponse {
   elapsed_seconds: number;
   message: string;
   last_error: string | null;
+  mode?: 'none' | 'qfq' | 'hfq' | null;
+  mode_progress?: number | null;
+  mode_completed?: number | null;
+  mode_total?: number | null;
+  progress?: number | null;
 }
 
 export interface AutoUpdateConfig {
@@ -52,6 +57,11 @@ export interface AutoUpdateConfig {
   interval_seconds: number;
   provider: 'baostock' | 'tushare';
   repair_days: number;
+  run_status?: 'idle' | 'running';
+  run_started_at?: number | null;
+  run_target_trade_date?: string | null;
+  run_mode?: 'none' | 'qfq' | 'hfq' | null;
+  run_message?: string | null;
   last_run_at?: number | null;
   last_success_at?: number | null;
   last_success_trade_date?: string | null;

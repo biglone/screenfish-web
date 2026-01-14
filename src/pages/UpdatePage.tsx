@@ -118,6 +118,21 @@ export function UpdatePage() {
     return started;
   }, [mode, updateWaitMutation.data, waitJobId, waitJobQuery.data]);
 
+  const waitJobProgress = useMemo(() => {
+    if (!waitJob) return null;
+    const raw = waitJob.progress ?? waitJob.mode_progress;
+    if (raw == null || !Number.isFinite(raw)) return null;
+    const ratio = Math.max(0, Math.min(1, raw));
+    const percent = Math.round(ratio * 100);
+    return {
+      ratio,
+      percent,
+      mode: waitJob.mode ?? null,
+      modeCompleted: waitJob.mode_completed ?? null,
+      modeTotal: waitJob.mode_total ?? null,
+    };
+  }, [waitJob]);
+
   useEffect(() => {
     if (!waitJob) return;
     if (waitJob.status === 'succeeded') {
@@ -368,6 +383,27 @@ export function UpdatePage() {
 
             {autoUpdateConfigQuery.data && (
               <div className="mt-4 text-xs text-gray-600">
+                {autoUpdateConfigQuery.data.run_status === 'running' && (
+                  <div className="mb-2 rounded-md bg-[color:var(--sf-primary-50)] px-3 py-2 text-[color:var(--sf-primary-800)]">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span className="font-medium">自动更新运行中</span>
+                    </div>
+                    <div className="mt-1 text-[color:var(--sf-primary-700)]">
+                      目标交易日：{formatDate(autoUpdateConfigQuery.data.run_target_trade_date)} | 模式：
+                      {autoUpdateConfigQuery.data.run_mode ?? '-'} | {autoUpdateConfigQuery.data.run_message ?? '-'}
+                    </div>
+                    <div className="mt-0.5 text-[color:var(--sf-primary-700)]">
+                      started_at：{formatTimestamp(autoUpdateConfigQuery.data.run_started_at)}
+                    </div>
+                  </div>
+                )}
+                {autoUpdateConfigQuery.data.run_status !== 'running' &&
+                  autoUpdateConfigQuery.data.run_message && (
+                    <div className="mb-2 rounded-md bg-gray-50 px-3 py-2 text-gray-700">
+                      提示：{autoUpdateConfigQuery.data.run_message}
+                    </div>
+                  )}
                 <div>上次尝试：{formatTimestamp(autoUpdateConfigQuery.data.last_run_at)}</div>
                 <div>
                   上次成功：{formatDate(autoUpdateConfigQuery.data.last_success_trade_date)}（{formatTimestamp(
@@ -787,6 +823,12 @@ export function UpdatePage() {
               </button>
             )}
           </div>
+
+          {mode === 'wait' && (
+            <div className="mt-2 text-xs text-gray-500">
+              支持断点续传：任务中断/失败后再次点击“开始等待更新”，会从已完成进度继续。
+            </div>
+          )}
         </div>
         </>
       )}
@@ -888,6 +930,25 @@ export function UpdatePage() {
 	              >
                 目标日期: {formatDate(waitJob.target_date)} | 提供商: {waitJob.provider} | 尝试次数: {waitJob.attempts} | 耗时: {waitJob.elapsed_seconds.toFixed(1)}秒
               </p>
+              {waitJob.status === 'running' && waitJobProgress && (
+                <div className="mt-3">
+                  <div className="flex items-center justify-between text-xs text-gray-600">
+                    <span>进度：{waitJobProgress.percent}%</span>
+                    <span className="truncate">
+                      {waitJobProgress.mode ? `模式：${waitJobProgress.mode}` : ''}
+                      {waitJobProgress.modeCompleted != null && waitJobProgress.modeTotal != null
+                        ? ` | ${waitJobProgress.modeCompleted}/${waitJobProgress.modeTotal}`
+                        : ''}
+                    </span>
+                  </div>
+                  <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                    <div
+                      className="h-full bg-[color:var(--sf-primary-600)] transition-all duration-300"
+                      style={{ width: `${waitJobProgress.percent}%` }}
+                    />
+                  </div>
+                </div>
+              )}
               <p className="mt-1 text-xs text-gray-600">
                 job_id: {waitJob.job_id} | latest: {formatDate(waitJob.latest_trade_date)} | {waitJob.message}
               </p>

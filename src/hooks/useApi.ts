@@ -95,6 +95,10 @@ export function useAutoUpdateConfig(enabled = true) {
     queryFn: () => api.getAutoUpdateConfig(),
     enabled,
     retry: false,
+    refetchInterval: (query) => {
+      const runStatus = (query.state.data as AutoUpdateConfig | undefined)?.run_status;
+      return runStatus === 'running' ? 5000 : 30000;
+    },
   });
 }
 
