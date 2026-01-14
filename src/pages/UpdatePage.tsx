@@ -31,6 +31,12 @@ export function UpdatePage() {
   const me = useMe(authEnabled);
   const isAdmin = !authEnabled || me.data?.role === 'admin';
 
+  const allowNormalUpdate = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    const host = window.location.hostname;
+    return host === 'localhost' || host === '127.0.0.1';
+  }, []);
+
   const { data: status, refetch: refetchStatus } = useStatus();
   const updateMutation = useUpdate();
   const updateWaitMutation = useUpdateWait();
@@ -119,8 +125,18 @@ export function UpdatePage() {
     }
   }, [refetchStatus, waitJob]);
 
+  useEffect(() => {
+    if (allowNormalUpdate) return;
+    if (mode !== 'normal') return;
+    setMode('wait');
+  }, [allowNormalUpdate, mode]);
+
   const handleUpdate = () => {
     if (mode === 'normal') {
+      if (!allowNormalUpdate) {
+        setMode('wait');
+        return;
+      }
       updateMutation.mutate(formData, {
         onSuccess: () => refetchStatus(),
       });
@@ -577,14 +593,17 @@ export function UpdatePage() {
         <div className="rounded-lg bg-white p-6 shadow">
           <div className="mb-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
-	              <label className="flex items-center">
+              <label className="flex items-center">
 	                <input
 	                  type="radio"
 	                  checked={mode === 'normal'}
 	                  onChange={() => setMode('normal')}
+	                  disabled={!allowNormalUpdate}
 	                  className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
 	                />
-                <span className="ml-2 text-sm text-gray-700">普通更新</span>
+                <span className={`ml-2 text-sm ${allowNormalUpdate ? 'text-gray-700' : 'text-gray-400'}`}>
+                  普通更新（仅本地）
+                </span>
               </label>
 	              <label className="flex items-center">
 	                <input
@@ -597,7 +616,7 @@ export function UpdatePage() {
               </label>
             </div>
             <div className="mt-2 text-xs text-gray-500">
-              推荐使用“等待更新”，避免普通更新耗时过长导致浏览器/Cloudflare 超时。
+              推荐使用“等待更新”。通过公网/Cloudflare 访问时，“普通更新”会超时（504/524），因此已默认禁用。
             </div>
           </div>
 
