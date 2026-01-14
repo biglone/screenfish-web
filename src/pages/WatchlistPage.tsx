@@ -86,6 +86,45 @@ function safeFilename(x: string): string {
   return x.replace(/[\\/:*?"<>|]+/g, '_').trim() || 'watchlist';
 }
 
+function normalizeWatchlistGroupName(name: string): string {
+  return String(name ?? '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .slice(0, 30);
+}
+
+function filenameStem(filename: string): string {
+  const raw = String(filename ?? '').split(/[\\/]/).pop() ?? '';
+  return raw.replace(/\.[^.]+$/, '');
+}
+
+function localDateStamp(now: Date): string {
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function buildUniqueGroupName(preferred: string, existingNames: string[]): string {
+  const existing = new Set(existingNames.map((x) => normalizeWatchlistGroupName(x)).filter(Boolean));
+  const base = normalizeWatchlistGroupName(preferred);
+  if (!base) return '导入';
+  if (!existing.has(base)) return base;
+
+  for (let i = 2; i <= 50; i++) {
+    const suffix = `-${i}`;
+    const baseMaxLen = Math.max(1, 30 - suffix.length);
+    const trimmedBase = base.slice(0, baseMaxLen);
+    const candidate = normalizeWatchlistGroupName(`${trimmedBase}${suffix}`);
+    if (candidate && !existing.has(candidate)) return candidate;
+  }
+
+  const now = new Date();
+  const suffix = `-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+  const baseMaxLen = Math.max(1, 30 - suffix.length);
+  return normalizeWatchlistGroupName(`${base.slice(0, baseMaxLen)}${suffix}`) || base;
+}
+
 const WATCHLIST_PANE_WIDTH_STORAGE_KEY = 'screenfish.watchlist.leftPaneWidth';
 const DEFAULT_LEFT_PANE_WIDTH = 360;
 const MIN_LEFT_PANE_WIDTH = 240;
@@ -521,7 +560,6 @@ export function WatchlistPage() {
   };
 
   const handleImportEbkClick = () => {
-    if (!activeGroup) return;
     importInputRef.current?.click();
   };
 
@@ -529,9 +567,9 @@ export function WatchlistPage() {
     const file = e.target.files?.[0] ?? null;
     e.target.value = '';
     if (!file) return;
-    if (!activeGroup) return;
 
     void (async () => {
+      let createdGroupId: string | null = null;
       try {
         setWatchlistBusy(true);
         setWatchlistError(null);
@@ -543,7 +581,20 @@ export function WatchlistPage() {
           throw new Error('文件中未解析到任何股票代码（请确认是通达信导出的 .EBK 文件）');
         }
 
-        const res = await api.upsertWatchlistItems(activeGroup.id, {
+        const now = new Date();
+        const preferredName =
+          normalizeWatchlistGroupName(filenameStem(file.name)) ||
+          normalizeWatchlistGroupName(`导入-${localDateStamp(now)}`);
+        const groupName = buildUniqueGroupName(
+          preferredName,
+          groups.map((g) => g.name)
+        );
+        createdGroupId = await createGroup(groupName);
+        if (!createdGroupId) {
+          throw new Error('新建分组失败，请稍后重试');
+        }
+
+        const res = await api.upsertWatchlistItems(createdGroupId, {
           items: tsCodes.map((ts_code) => ({ ts_code, name: null })),
           ignore_unknown: true,
         });
@@ -554,12 +605,15 @@ export function WatchlistPage() {
           : [];
         const shownUnknownCodes = unknownCodes.slice(0, 10);
 
+        const unknownSet = new Set(unknownCodes);
+        const firstKnown = tsCodes.find((x) => !unknownSet.has(x)) ?? tsCodes[0] ?? null;
+
         setFilter('');
-        setActiveGroupId(activeGroup.id);
-        setActiveTsCode((prev) => prev ?? tsCodes[0] ?? null);
+        setActiveGroupId(createdGroupId);
+        setActiveTsCode(firstKnown);
         setAutoSelectDetail(true);
         const noticeLines = [
-          `已导入 ${Math.max(0, tsCodes.length - unknownTotal)} 只股票到「${activeGroup.name}」`,
+          `已导入 ${Math.max(0, tsCodes.length - unknownTotal)} 只股票到「${groupName}」`,
         ];
         if (unknownTotal > 0) {
           const suffix =
@@ -573,6 +627,13 @@ export function WatchlistPage() {
         }
         setWatchlistNotice(noticeLines.join('\n'));
       } catch (err) {
+        if (createdGroupId) {
+          try {
+            await deleteGroup(createdGroupId);
+          } catch {
+            // Best-effort cleanup only.
+          }
+        }
         const msg = err instanceof Error ? err.message : String(err);
         setWatchlistError(msg);
       } finally {
@@ -596,12 +657,12 @@ export function WatchlistPage() {
           <button
             type="button"
             onClick={handleImportEbkClick}
-            disabled={!activeGroup || watchlistBusy}
+            disabled={watchlistBusy}
             className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100"
-            title={activeGroup ? `导入到「${activeGroup.name}」` : '导入'}
+            title="导入并新建分组"
           >
             <Upload className="h-4 w-4" />
-            导入 EBK
+            导入 EBK（新分组）
           </button>
           <button
             type="button"
