@@ -7,6 +7,8 @@ import type {
   UpdateWaitResponse,
   AutoUpdateConfig,
   AutoScreenConfig,
+  AutoScreenConfigCreate,
+  AutoScreenConfigListResponse,
   AutoScreenConfigUpdate,
   AutoScreenRunRequest,
   AutoScreenRunResponse,
@@ -217,6 +219,31 @@ class StockScreenerApi {
 
   async updateAutoScreenConfig(request: AutoScreenConfigUpdate): Promise<AutoScreenConfig> {
     const { data } = await this.client.put<AutoScreenConfig>('/auto-screen-config', request);
+    return data;
+  }
+
+  async listAutoScreenConfigs(): Promise<AutoScreenConfigListResponse> {
+    const { data } = await this.client.get<AutoScreenConfigListResponse>('/auto-screen-configs');
+    return data;
+  }
+
+  async createAutoScreenConfig(request: AutoScreenConfigCreate): Promise<AutoScreenConfig> {
+    const { data } = await this.client.post<AutoScreenConfig>('/auto-screen-configs', request);
+    return data;
+  }
+
+  async updateAutoScreenConfigItem(configId: string, request: AutoScreenConfigUpdate): Promise<AutoScreenConfig> {
+    const { data } = await this.client.put<AutoScreenConfig>(
+      `/auto-screen-configs/${encodeURIComponent(configId)}`,
+      request
+    );
+    return data;
+  }
+
+  async deleteAutoScreenConfigItem(configId: string): Promise<{ ok: boolean }> {
+    const { data } = await this.client.delete<{ ok: boolean }>(
+      `/auto-screen-configs/${encodeURIComponent(configId)}`
+    );
     return data;
   }
 

@@ -69,6 +69,7 @@ export interface AutoUpdateConfig {
 }
 
 export interface AutoScreenConfig {
+  id?: string | null;
   enabled: boolean;
   group_name: string;
   group_id?: string | null;
@@ -97,9 +98,16 @@ export interface AutoScreenConfigUpdate {
   replace_group: boolean;
 }
 
+export interface AutoScreenConfigCreate extends AutoScreenConfigUpdate {}
+
+export interface AutoScreenConfigListResponse {
+  configs: AutoScreenConfig[];
+}
+
 export interface AutoScreenRunRequest {
   date?: string;
   force?: boolean;
+  config_id?: string | null;
 }
 
 export interface AutoScreenRunResponse {

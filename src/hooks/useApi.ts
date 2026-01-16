@@ -3,6 +3,8 @@ import api from '../api/client';
 import type {
   AutoUpdateConfig,
   AutoScreenConfig,
+  AutoScreenConfigCreate,
+  AutoScreenConfigListResponse,
   AutoScreenConfigUpdate,
   AutoScreenRunRequest,
   AutoScreenRunResponse,
@@ -20,6 +22,7 @@ export const queryKeys = {
   status: ['status'] as const,
   autoUpdateConfig: ['autoUpdateConfig'] as const,
   autoScreenConfig: ['autoScreenConfig'] as const,
+  autoScreenConfigs: ['autoScreenConfigs'] as const,
   dataIntegrity: (params: {
     provider?: 'baostock' | 'tushare';
     date?: string;
@@ -121,12 +124,59 @@ export function useAutoScreenConfig(enabled = true) {
   });
 }
 
+export function useAutoScreenConfigs(enabled = true) {
+  return useQuery<AutoScreenConfigListResponse>({
+    queryKey: queryKeys.autoScreenConfigs,
+    queryFn: () => api.listAutoScreenConfigs(),
+    enabled,
+    retry: false,
+  });
+}
+
 export function useUpdateAutoScreenConfig() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (request: AutoScreenConfigUpdate) => api.updateAutoScreenConfig(request),
     onSuccess: (data: AutoScreenConfig) => {
       queryClient.setQueryData(queryKeys.autoScreenConfig, data);
+      queryClient.invalidateQueries({ queryKey: queryKeys.autoScreenConfigs });
+    },
+  });
+}
+
+export function useCreateAutoScreenConfig() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request: AutoScreenConfigCreate) => api.createAutoScreenConfig(request),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.autoScreenConfigs });
+    },
+  });
+}
+
+export function useUpdateAutoScreenConfigItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      configId,
+      request,
+    }: {
+      configId: string;
+      request: AutoScreenConfigUpdate;
+    }) => api.updateAutoScreenConfigItem(configId, request),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.autoScreenConfigs });
+      queryClient.invalidateQueries({ queryKey: queryKeys.autoScreenConfig });
+    },
+  });
+}
+
+export function useDeleteAutoScreenConfigItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (configId: string) => api.deleteAutoScreenConfigItem(configId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.autoScreenConfigs });
     },
   });
 }
@@ -137,6 +187,7 @@ export function useRunAutoScreen() {
     mutationFn: (request: AutoScreenRunRequest) => api.runAutoScreen(request),
     onSuccess: (data: AutoScreenRunResponse) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.autoScreenConfig });
+      queryClient.invalidateQueries({ queryKey: queryKeys.autoScreenConfigs });
       queryClient.invalidateQueries({ queryKey: queryKeys.status });
       return data;
     },

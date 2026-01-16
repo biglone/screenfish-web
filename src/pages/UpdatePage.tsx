@@ -7,14 +7,16 @@ import {
   useStatus,
   useAutoUpdateConfig,
   useUpdateAutoUpdateConfig,
-  useAutoScreenConfig,
-  useUpdateAutoScreenConfig,
+  useAutoScreenConfigs,
+  useCreateAutoScreenConfig,
+  useUpdateAutoScreenConfigItem,
+  useDeleteAutoScreenConfigItem,
   useRunAutoScreen,
   useAvailability,
   useHealth,
 } from '../hooks/useApi';
 import { useMe } from '../hooks/useAuth';
-import type { UpdateRequest, UpdateWaitRequest, UpdateWaitResponse } from '../types/api';
+import type { AutoScreenConfig, UpdateRequest, UpdateWaitRequest, UpdateWaitResponse } from '../types/api';
 import {
   RefreshCw,
   Loader2,
@@ -50,19 +52,13 @@ export function UpdatePage() {
   const [autoRepairDaysDraft, setAutoRepairDaysDraft] = useState<number | null>(null);
   const [autoSavedAt, setAutoSavedAt] = useState<number | null>(null);
 
-  const autoScreenConfigQuery = useAutoScreenConfig(isAdmin);
-  const updateAutoScreenConfigMutation = useUpdateAutoScreenConfig();
+  const autoScreenConfigsQuery = useAutoScreenConfigs(isAdmin);
+  const createAutoScreenConfigMutation = useCreateAutoScreenConfig();
+  const updateAutoScreenConfigItemMutation = useUpdateAutoScreenConfigItem();
+  const deleteAutoScreenConfigItemMutation = useDeleteAutoScreenConfigItem();
   const runAutoScreenMutation = useRunAutoScreen();
-  const [screenEnabledDraft, setScreenEnabledDraft] = useState<boolean | null>(null);
-  const [screenGroupNameDraft, setScreenGroupNameDraft] = useState<string | null>(null);
-  const [screenComboDraft, setScreenComboDraft] = useState<'and' | 'or' | null>(null);
-  const [screenRulesDraft, setScreenRulesDraft] = useState<string | null>(null);
-  const [screenLookbackDaysDraft, setScreenLookbackDaysDraft] = useState<number | null>(null);
-  const [screenExcludeStDraft, setScreenExcludeStDraft] = useState<boolean | null>(null);
-  const [screenPriceAdjustDraft, setScreenPriceAdjustDraft] = useState<'none' | 'qfq' | 'hfq' | null>(null);
-  const [screenReplaceGroupDraft, setScreenReplaceGroupDraft] = useState<boolean | null>(null);
-  const [screenForceRun, setScreenForceRun] = useState(false);
-  const [screenSavedAt, setScreenSavedAt] = useState<number | null>(null);
+  const [autoScreenDrafts, setAutoScreenDrafts] = useState<Record<string, Partial<AutoScreenConfig>>>({});
+  const [autoScreenSavedAt, setAutoScreenSavedAt] = useState<Record<string, number>>({});
 
   const autoEnabled = autoEnabledDraft ?? autoUpdateConfigQuery.data?.enabled ?? false;
   const autoIntervalMinutes =
@@ -73,15 +69,7 @@ export function UpdatePage() {
   const autoProvider = autoProviderDraft ?? autoUpdateConfigQuery.data?.provider ?? 'baostock';
   const autoRepairDays = autoRepairDaysDraft ?? autoUpdateConfigQuery.data?.repair_days ?? 30;
 
-  const screenEnabled = screenEnabledDraft ?? autoScreenConfigQuery.data?.enabled ?? false;
-  const screenGroupName = screenGroupNameDraft ?? autoScreenConfigQuery.data?.group_name ?? '自动筛选';
-  const screenCombo = screenComboDraft ?? autoScreenConfigQuery.data?.combo ?? 'and';
-  const screenRules = screenRulesDraft ?? autoScreenConfigQuery.data?.rules ?? '';
-  const screenLookbackDays = screenLookbackDaysDraft ?? autoScreenConfigQuery.data?.lookback_days ?? 200;
-  const screenExcludeSt = screenExcludeStDraft ?? autoScreenConfigQuery.data?.exclude_st ?? true;
-  const screenPriceAdjust = screenPriceAdjustDraft ?? autoScreenConfigQuery.data?.price_adjust ?? 'qfq';
-  const screenReplaceGroup = screenReplaceGroupDraft ?? autoScreenConfigQuery.data?.replace_group ?? true;
-  const screenWithName = autoScreenConfigQuery.data?.with_name ?? false;
+  const autoScreenConfigs = autoScreenConfigsQuery.data?.configs ?? [];
 
   const [mode, setMode] = useState<'normal' | 'wait'>('wait');
   const [waitJobId, setWaitJobId] = useState<string | null>(null);
@@ -185,33 +173,82 @@ export function UpdatePage() {
     );
   };
 
-  const handleSaveAutoScreenConfig = () => {
-    updateAutoScreenConfigMutation.mutate(
+  const updateAutoScreenDraft = (configId: string, patch: Partial<AutoScreenConfig>) => {
+    setAutoScreenDrafts((prev) => ({
+      ...prev,
+      [configId]: { ...(prev[configId] ?? {}), ...patch },
+    }));
+  };
+
+  const clearAutoScreenDraft = (configId: string) => {
+    setAutoScreenDrafts((prev) => {
+      const next = { ...prev };
+      delete next[configId];
+      return next;
+    });
+  };
+
+  const handleCreateAutoScreenConfig = () => {
+    const nextIndex = autoScreenConfigs.length + 1;
+    createAutoScreenConfigMutation.mutate(
       {
-        enabled: screenEnabled,
-        group_name: screenGroupName,
-        combo: screenCombo,
-        rules: screenRules.trim() ? screenRules.trim() : null,
-        lookback_days: Math.max(0, Math.round(screenLookbackDays)),
-        with_name: screenWithName,
-        exclude_st: screenExcludeSt,
-        price_adjust: screenPriceAdjust,
-        replace_group: screenReplaceGroup,
+        enabled: true,
+        group_name: `自动筛选-${nextIndex}`,
+        combo: 'and',
+        rules: null,
+        lookback_days: 200,
+        with_name: false,
+        exclude_st: true,
+        price_adjust: 'qfq',
+        replace_group: true,
       },
       {
         onSuccess: () => {
-          setScreenEnabledDraft(null);
-          setScreenGroupNameDraft(null);
-          setScreenComboDraft(null);
-          setScreenRulesDraft(null);
-          setScreenLookbackDaysDraft(null);
-          setScreenExcludeStDraft(null);
-          setScreenPriceAdjustDraft(null);
-          setScreenReplaceGroupDraft(null);
-          setScreenSavedAt(Date.now());
+          void autoScreenConfigsQuery.refetch();
         },
       }
     );
+  };
+
+  const handleSaveAutoScreenConfig = (config: AutoScreenConfig) => {
+    const configId = config.id ?? '';
+    if (!configId) return;
+    const draft = autoScreenDrafts[configId] ?? {};
+    const groupName = String(draft.group_name ?? config.group_name ?? '').trim();
+    updateAutoScreenConfigItemMutation.mutate(
+      {
+        configId,
+        request: {
+          enabled: (draft.enabled ?? config.enabled) ?? false,
+          group_name: groupName || '自动筛选',
+          combo: (draft.combo ?? config.combo ?? 'and') as 'and' | 'or',
+          rules: (draft.rules ?? config.rules ?? '').trim() ? (draft.rules ?? config.rules ?? '').trim() : null,
+          lookback_days: Math.max(0, Math.round(draft.lookback_days ?? config.lookback_days ?? 200)),
+          with_name: (draft.with_name ?? config.with_name ?? false) ?? false,
+          exclude_st: (draft.exclude_st ?? config.exclude_st ?? true) ?? false,
+          price_adjust: (draft.price_adjust ?? config.price_adjust ?? 'qfq') as 'none' | 'qfq' | 'hfq',
+          replace_group: (draft.replace_group ?? config.replace_group ?? true) ?? true,
+        },
+      },
+      {
+        onSuccess: () => {
+          clearAutoScreenDraft(configId);
+          setAutoScreenSavedAt((prev) => ({ ...prev, [configId]: Date.now() }));
+        },
+      }
+    );
+  };
+
+  const handleDeleteAutoScreenConfig = (configId: string) => {
+    deleteAutoScreenConfigItemMutation.mutate(configId, {
+      onSuccess: () => {
+        setAutoScreenSavedAt((prev) => {
+          const next = { ...prev };
+          delete next[configId];
+          return next;
+        });
+      },
+    });
   };
 
   const isPending =
@@ -418,24 +455,47 @@ export function UpdatePage() {
           </div>
 
           <div className="rounded-lg bg-white p-6 shadow">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">自动筛选设置</h2>
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">自动筛选设置</h2>
+              <button
+                type="button"
+                onClick={handleCreateAutoScreenConfig}
+                disabled={!isAdmin || createAutoScreenConfigMutation.isPending}
+                className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:bg-gray-100"
+              >
+                <Save className="h-4 w-4" />
+                新增配置
+              </button>
+            </div>
 
-            {(autoScreenConfigQuery.isLoading || autoScreenConfigQuery.isFetching) && (
+            {(autoScreenConfigsQuery.isLoading || autoScreenConfigsQuery.isFetching) && (
               <div className="mb-4 flex items-center gap-2 text-sm text-gray-500">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 加载中...
               </div>
             )}
 
-            {autoScreenConfigQuery.error && (
+            {autoScreenConfigsQuery.error && (
               <div className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-                读取自动筛选配置失败：{(autoScreenConfigQuery.error as Error).message}
+                读取自动筛选配置失败：{(autoScreenConfigsQuery.error as Error).message}
               </div>
             )}
 
-            {updateAutoScreenConfigMutation.error && (
+            {createAutoScreenConfigMutation.error && (
               <div className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-                保存自动筛选配置失败：{(updateAutoScreenConfigMutation.error as Error).message}
+                新增自动筛选配置失败：{(createAutoScreenConfigMutation.error as Error).message}
+              </div>
+            )}
+
+            {updateAutoScreenConfigItemMutation.error && (
+              <div className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                保存自动筛选配置失败：{(updateAutoScreenConfigItemMutation.error as Error).message}
+              </div>
+            )}
+
+            {deleteAutoScreenConfigItemMutation.error && (
+              <div className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                删除自动筛选配置失败：{(deleteAutoScreenConfigItemMutation.error as Error).message}
               </div>
             )}
 
@@ -445,181 +505,214 @@ export function UpdatePage() {
               </div>
             )}
 
-            {autoScreenConfigQuery.data?.last_error && (
-              <div className="mb-4 rounded-md bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
-                上次失败：{autoScreenConfigQuery.data.last_error}
+            {autoScreenConfigs.length === 0 && (
+              <div className="rounded-md border border-dashed border-gray-200 p-4 text-sm text-gray-500">
+                暂无配置，点击右上角“新增配置”创建自动筛选组合。
               </div>
             )}
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">启用</label>
-                <label className="mt-2 flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={screenEnabled}
-                    onChange={(e) => setScreenEnabledDraft(e.target.checked)}
-                    disabled={!autoScreenConfigQuery.data || updateAutoScreenConfigMutation.isPending}
-                    className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
-                  />
-                  自动筛选（更新成功后执行）
-                </label>
-              </div>
+            <div className="space-y-4">
+              {autoScreenConfigs.map((config, index) => {
+                const configId = config.id ?? '';
+                if (!configId) return null;
+                const draft = autoScreenDrafts[configId] ?? {};
+                const enabled = draft.enabled ?? config.enabled ?? false;
+                const groupName = String(draft.group_name ?? config.group_name ?? '自动筛选');
+                const combo = (draft.combo ?? config.combo ?? 'and') as 'and' | 'or';
+                const rules = String(draft.rules ?? config.rules ?? '');
+                const lookbackDays = Number(draft.lookback_days ?? config.lookback_days ?? 200);
+                const excludeSt = draft.exclude_st ?? config.exclude_st ?? true;
+                const withName = draft.with_name ?? config.with_name ?? false;
+                const priceAdjust = (draft.price_adjust ?? config.price_adjust ?? 'qfq') as 'none' | 'qfq' | 'hfq';
+                const replaceGroup = draft.replace_group ?? config.replace_group ?? true;
+                const canSave = groupName.trim().length > 0 && !updateAutoScreenConfigItemMutation.isPending;
+                const savedAt = autoScreenSavedAt[configId];
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700">分组名称</label>
-                <input
-                  type="text"
-                  value={screenGroupName}
-                  onChange={(e) => setScreenGroupNameDraft(e.target.value)}
-                  disabled={!autoScreenConfigQuery.data || updateAutoScreenConfigMutation.isPending}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
-                />
-                <div className="mt-1 text-xs text-gray-500">自动写入到该分组（不存在则创建）</div>
-              </div>
+                return (
+                  <div key={configId} className="rounded-lg border border-gray-200 p-4">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="text-sm font-semibold text-gray-900">配置 {index + 1}</div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!window.confirm('确认删除该自动筛选配置吗？')) return;
+                          handleDeleteAutoScreenConfig(configId);
+                        }}
+                        disabled={deleteAutoScreenConfigItemMutation.isPending}
+                        className="text-sm text-red-600 hover:text-red-700 disabled:text-red-300"
+                      >
+                        删除
+                      </button>
+                    </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700">赋权模式</label>
-                <select
-                  value={screenPriceAdjust}
-                  onChange={(e) => setScreenPriceAdjustDraft(e.target.value as 'none' | 'qfq' | 'hfq')}
-                  disabled={!autoScreenConfigQuery.data || updateAutoScreenConfigMutation.isPending}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
-                >
-                  <option value="qfq">前复权（qfq）</option>
-                  <option value="hfq">后复权（hfq）</option>
-                  <option value="none">不复权（none）</option>
-                </select>
-              </div>
+                    {config.last_error && (
+                      <div className="mt-3 rounded-md bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
+                        上次失败：{config.last_error}
+                      </div>
+                    )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700">组合方式</label>
-                <select
-                  value={screenCombo}
-                  onChange={(e) => setScreenComboDraft(e.target.value as 'and' | 'or')}
-                  disabled={!autoScreenConfigQuery.data || updateAutoScreenConfigMutation.isPending}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
-                >
-                  <option value="and">AND（全部满足）</option>
-                  <option value="or">OR（满足任意）</option>
-                </select>
-              </div>
+                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">启用</label>
+                        <label className="mt-2 flex items-center gap-2 text-sm text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={enabled}
+                            onChange={(e) => updateAutoScreenDraft(configId, { enabled: e.target.checked })}
+                            className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
+                          />
+                          自动筛选（更新成功后执行）
+                        </label>
+                      </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700">回溯天数</label>
-                <input
-                  type="number"
-                  value={screenLookbackDays}
-                  onChange={(e) => {
-                    const v = parseInt(e.target.value, 10);
-                    setScreenLookbackDaysDraft(Number.isNaN(v) ? 200 : Math.max(0, v));
-                  }}
-                  disabled={!autoScreenConfigQuery.data || updateAutoScreenConfigMutation.isPending}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
-                />
-              </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">分组名称</label>
+                        <input
+                          type="text"
+                          value={groupName}
+                          onChange={(e) => updateAutoScreenDraft(configId, { group_name: e.target.value })}
+                          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                        />
+                        <div className="mt-1 text-xs text-gray-500">分组名会自动追加交易日期。</div>
+                      </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700">选项</label>
-                <div className="mt-2 space-y-2 text-sm text-gray-700">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={screenExcludeSt}
-                      onChange={(e) => setScreenExcludeStDraft(e.target.checked)}
-                      disabled={!autoScreenConfigQuery.data || updateAutoScreenConfigMutation.isPending}
-                      className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
-                    />
-                    剔除 ST
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={screenReplaceGroup}
-                      onChange={(e) => setScreenReplaceGroupDraft(e.target.checked)}
-                      disabled={!autoScreenConfigQuery.data || updateAutoScreenConfigMutation.isPending}
-                      className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
-                    />
-                    覆盖分组（替换旧结果）
-                  </label>
-                </div>
-              </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">赋权模式</label>
+                        <select
+                          value={priceAdjust}
+                          onChange={(e) =>
+                            updateAutoScreenDraft(configId, { price_adjust: e.target.value as 'none' | 'qfq' | 'hfq' })
+                          }
+                          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                        >
+                          <option value="qfq">前复权（qfq）</option>
+                          <option value="hfq">后复权（hfq）</option>
+                          <option value="none">不复权（none）</option>
+                        </select>
+                      </div>
 
-              <div className="sm:col-span-2 lg:col-span-3">
-                <label className="block text-sm font-medium text-gray-700">规则（逗号分隔）</label>
-                <textarea
-                  value={screenRules}
-                  onChange={(e) => setScreenRulesDraft(e.target.value)}
-                  rows={2}
-                  placeholder="例如：公式A,公式B（留空表示使用全部启用的公式；若无则使用内置规则）"
-                  disabled={!autoScreenConfigQuery.data || updateAutoScreenConfigMutation.isPending}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
-                />
-                <div className="mt-1 text-xs text-gray-500">
-                  规则会在保存时校验（内置规则如 midline_ma60/kdj_oversold 也可用）。
-                </div>
-              </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">组合方式</label>
+                        <select
+                          value={combo}
+                          onChange={(e) => updateAutoScreenDraft(configId, { combo: e.target.value as 'and' | 'or' })}
+                          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                        >
+                          <option value="and">AND（全部满足）</option>
+                          <option value="or">OR（满足任意）</option>
+                        </select>
+                      </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700">手动执行</label>
-                <label className="mt-2 flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={screenForceRun}
-                    onChange={(e) => setScreenForceRun(e.target.checked)}
-                    className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
-                  />
-                  强制重新筛选
-                </label>
-                <div className="mt-1 text-xs text-gray-500">用于验证/回测同一天结果</div>
-              </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">回溯天数</label>
+                        <input
+                          type="number"
+                          value={lookbackDays}
+                          onChange={(e) => {
+                            const v = parseInt(e.target.value, 10);
+                            updateAutoScreenDraft(configId, { lookback_days: Number.isNaN(v) ? 200 : Math.max(0, v) });
+                          }}
+                          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">选项</label>
+                        <div className="mt-2 space-y-2 text-sm text-gray-700">
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={excludeSt}
+                              onChange={(e) => updateAutoScreenDraft(configId, { exclude_st: e.target.checked })}
+                              className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
+                            />
+                            剔除 ST
+                          </label>
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={withName}
+                              onChange={(e) => updateAutoScreenDraft(configId, { with_name: e.target.checked })}
+                              className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
+                            />
+                            写入名称
+                          </label>
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={replaceGroup}
+                              onChange={(e) => updateAutoScreenDraft(configId, { replace_group: e.target.checked })}
+                              className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
+                            />
+                            覆盖分组（替换旧结果）
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="sm:col-span-2 lg:col-span-3">
+                        <label className="block text-sm font-medium text-gray-700">规则（逗号分隔）</label>
+                        <textarea
+                          value={rules}
+                          onChange={(e) => updateAutoScreenDraft(configId, { rules: e.target.value })}
+                          rows={2}
+                          placeholder="例如：公式A,公式B（留空表示使用全部启用的公式；若无则使用内置规则）"
+                          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                        />
+                        <div className="mt-1 text-xs text-gray-500">
+                          规则会在保存时校验（内置规则如 midline_ma60/kdj_oversold 也可用）。
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                      <button
+                        type="button"
+                        onClick={() => handleSaveAutoScreenConfig(config)}
+                        disabled={!canSave}
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[color:var(--sf-primary-600)] px-4 py-2 text-white hover:bg-[color:var(--sf-primary-700)] disabled:bg-[color:var(--sf-primary-400)] sm:w-auto"
+                      >
+                        {updateAutoScreenConfigItemMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4" />
+                        )}
+                        保存配置
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          runAutoScreenMutation.mutate({ date: 'latest', force: false, config_id: configId })
+                        }
+                        disabled={runAutoScreenMutation.isPending}
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50 disabled:bg-gray-100 sm:w-auto"
+                      >
+                        {runAutoScreenMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4" />
+                        )}
+                        立即执行一次
+                      </button>
+                    </div>
+
+                    {savedAt && (
+                      <div className="mt-3 text-xs text-green-700">
+                        已保存（{new Date(savedAt).toLocaleString()}）
+                      </div>
+                    )}
+
+                    <div className="mt-3 text-xs text-gray-600">
+                      上次执行：
+                      {config.last_trade_date
+                        ? `${config.last_trade_date}（命中 ${config.last_count ?? 0}）`
+                        : '—'}
+                      {config.group_id ? ` | 分组ID: ${config.group_id}` : ''}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <button
-                type="button"
-                onClick={handleSaveAutoScreenConfig}
-                disabled={!autoScreenConfigQuery.data || updateAutoScreenConfigMutation.isPending}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[color:var(--sf-primary-600)] px-4 py-2 text-white hover:bg-[color:var(--sf-primary-700)] disabled:bg-[color:var(--sf-primary-400)] sm:w-auto"
-              >
-                {updateAutoScreenConfigMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4" />
-                )}
-                保存配置
-              </button>
-
-              <button
-                type="button"
-                onClick={() => runAutoScreenMutation.mutate({ date: 'latest', force: screenForceRun })}
-                disabled={!autoScreenConfigQuery.data || runAutoScreenMutation.isPending}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50 disabled:bg-gray-100 sm:w-auto"
-              >
-                {runAutoScreenMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4" />
-                )}
-                立即执行一次
-              </button>
-            </div>
-
-            {screenSavedAt && (
-              <div className="mt-3 text-xs text-green-700">
-                已保存（{new Date(screenSavedAt).toLocaleString()}）
-              </div>
-            )}
-
-            {autoScreenConfigQuery.data && (
-              <div className="mt-4 text-xs text-gray-600">
-                上次执行：
-                {autoScreenConfigQuery.data.last_trade_date
-                  ? `${autoScreenConfigQuery.data.last_trade_date}（命中 ${autoScreenConfigQuery.data.last_count ?? 0}）`
-                  : '—'}
-                {autoScreenConfigQuery.data.group_id ? ` | 分组ID: ${autoScreenConfigQuery.data.group_id}` : ''}
-              </div>
-            )}
 
             {runAutoScreenMutation.data?.message && (
               <div className="mt-3 text-xs text-green-700">{runAutoScreenMutation.data.message}</div>
@@ -630,24 +723,24 @@ export function UpdatePage() {
           <div className="mb-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
               <label className="flex items-center">
-	                <input
-	                  type="radio"
-	                  checked={mode === 'normal'}
-	                  onChange={() => setMode('normal')}
-	                  disabled={!allowNormalUpdate}
-	                  className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
-	                />
+                  <input
+                    type="radio"
+                    checked={mode === 'normal'}
+                    onChange={() => setMode('normal')}
+                    disabled={!allowNormalUpdate}
+                    className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
+                  />
                 <span className={`ml-2 text-sm ${allowNormalUpdate ? 'text-gray-700' : 'text-gray-400'}`}>
                   普通更新（仅本地）
                 </span>
               </label>
-	              <label className="flex items-center">
-	                <input
-	                  type="radio"
-	                  checked={mode === 'wait'}
-	                  onChange={() => setMode('wait')}
-	                  className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
-	                />
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    checked={mode === 'wait'}
+                    onChange={() => setMode('wait')}
+                    className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
+                  />
                 <span className="ml-2 text-sm text-gray-700">等待更新（轮询直到数据可用）</span>
               </label>
             </div>
@@ -661,18 +754,18 @@ export function UpdatePage() {
               <label className="block text-sm font-medium text-gray-700">
                 数据提供商
               </label>
-	              <select
-	                value={mode === 'normal' ? formData.provider : waitData.provider}
-	                onChange={(e) => {
-	                  const provider = e.target.value as 'baostock' | 'tushare';
-	                  if (mode === 'normal') {
-	                    setFormData({ ...formData, provider });
-	                  } else {
-	                    setWaitData({ ...waitData, provider });
-	                  }
-	                }}
-	                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
-	              >
+                <select
+                  value={mode === 'normal' ? formData.provider : waitData.provider}
+                  onChange={(e) => {
+                    const provider = e.target.value as 'baostock' | 'tushare';
+                    if (mode === 'normal') {
+                      setFormData({ ...formData, provider });
+                    } else {
+                      setWaitData({ ...waitData, provider });
+                    }
+                  }}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                >
                 <option value="baostock">BaoStock（免费）</option>
                 <option value="tushare">TuShare（需要 Token）</option>
               </select>
@@ -684,29 +777,29 @@ export function UpdatePage() {
                   <label className="block text-sm font-medium text-gray-700">
                     开始日期
                   </label>
-	                  <input
-	                    type="text"
-	                    value={formData.start ?? ''}
-	                    onChange={(e) =>
-	                      setFormData({ ...formData, start: e.target.value || null })
-	                    }
-	                    placeholder="YYYYMMDD（留空自动）"
-	                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
-	                  />
+                    <input
+                      type="text"
+                      value={formData.start ?? ''}
+                      onChange={(e) =>
+                        setFormData({ ...formData, start: e.target.value || null })
+                      }
+                      placeholder="YYYYMMDD（留空自动）"
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                    />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     结束日期
                   </label>
-	                  <input
-	                    type="text"
-	                    value={formData.end ?? ''}
-	                    onChange={(e) =>
-	                      setFormData({ ...formData, end: e.target.value || null })
-	                    }
-	                    placeholder="YYYYMMDD（留空到最新）"
-	                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
-	                  />
+                    <input
+                      type="text"
+                      value={formData.end ?? ''}
+                      onChange={(e) =>
+                        setFormData({ ...formData, end: e.target.value || null })
+                      }
+                      placeholder="YYYYMMDD（留空到最新）"
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                    />
                 </div>
               </>
             ) : (
@@ -715,50 +808,50 @@ export function UpdatePage() {
                   <label className="block text-sm font-medium text-gray-700">
                     目标日期
                   </label>
-	                  <input
-	                    type="text"
-	                    value={waitData.target_date ?? ''}
-	                    onChange={(e) =>
-	                      setWaitData({
-	                        ...waitData,
-	                        target_date: e.target.value || null,
-	                      })
-	                    }
-	                    placeholder="YYYYMMDD（留空为今日）"
-	                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
-	                  />
+                    <input
+                      type="text"
+                      value={waitData.target_date ?? ''}
+                      onChange={(e) =>
+                        setWaitData({
+                          ...waitData,
+                          target_date: e.target.value || null,
+                        })
+                      }
+                      placeholder="YYYYMMDD（留空为今日）"
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                    />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     轮询间隔（秒）
                   </label>
-	                  <input
-	                    type="number"
-	                    value={waitData.interval_seconds}
-	                    onChange={(e) =>
-	                      setWaitData({
-	                        ...waitData,
-	                        interval_seconds: parseInt(e.target.value) || 300,
-	                      })
-	                    }
-	                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
-	                  />
+                    <input
+                      type="number"
+                      value={waitData.interval_seconds}
+                      onChange={(e) =>
+                        setWaitData({
+                          ...waitData,
+                          interval_seconds: parseInt(e.target.value) || 300,
+                        })
+                      }
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                    />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     超时时间（秒）
                   </label>
-	                  <input
-	                    type="number"
-	                    value={waitData.timeout_seconds}
-	                    onChange={(e) =>
-	                      setWaitData({
-	                        ...waitData,
-	                        timeout_seconds: parseInt(e.target.value) || 7200,
-	                      })
-	                    }
-	                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
-	                  />
+                    <input
+                      type="number"
+                      value={waitData.timeout_seconds}
+                      onChange={(e) =>
+                        setWaitData({
+                          ...waitData,
+                          timeout_seconds: parseInt(e.target.value) || 7200,
+                        })
+                      }
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                    />
                 </div>
               </>
             )}
@@ -767,28 +860,28 @@ export function UpdatePage() {
               <label className="block text-sm font-medium text-gray-700">
                 修复天数
               </label>
-	              <input
-	                type="number"
-	                value={mode === 'normal' ? formData.repair_days : waitData.repair_days}
-	                onChange={(e) => {
-	                  const repair_days = parseInt(e.target.value) || 30;
-	                  if (mode === 'normal') {
-	                    setFormData({ ...formData, repair_days });
-	                  } else {
-	                    setWaitData({ ...waitData, repair_days });
-	                  }
-	                }}
-	                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
-	              />
+                <input
+                  type="number"
+                  value={mode === 'normal' ? formData.repair_days : waitData.repair_days}
+                  onChange={(e) => {
+                    const repair_days = parseInt(e.target.value) || 30;
+                    if (mode === 'normal') {
+                      setFormData({ ...formData, repair_days });
+                    } else {
+                      setWaitData({ ...waitData, repair_days });
+                    }
+                  }}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                />
             </div>
           </div>
 
-	          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-	            <button
-	              onClick={handleUpdate}
-	              disabled={isPending || (mode === 'wait' && waitJob?.status === 'running')}
-	              className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[color:var(--sf-primary-600)] px-4 py-2 text-white hover:bg-[color:var(--sf-primary-700)] disabled:bg-[color:var(--sf-primary-400)] sm:w-auto"
-	            >
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <button
+                onClick={handleUpdate}
+                disabled={isPending || (mode === 'wait' && waitJob?.status === 'running')}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[color:var(--sf-primary-600)] px-4 py-2 text-white hover:bg-[color:var(--sf-primary-700)] disabled:bg-[color:var(--sf-primary-400)] sm:w-auto"
+              >
               {isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
@@ -837,13 +930,13 @@ export function UpdatePage() {
       <div className="rounded-lg bg-white p-6 shadow">
         <h2 className="mb-4 text-lg font-semibold text-gray-900">检查数据可用性</h2>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-	        <input
-	          type="text"
-	          value={checkDate}
-	          onChange={(e) => setCheckDate(e.target.value)}
-	          placeholder="YYYYMMDD"
-	          className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)] sm:w-48"
-	        />
+          <input
+            type="text"
+            value={checkDate}
+            onChange={(e) => setCheckDate(e.target.value)}
+            placeholder="YYYYMMDD"
+            className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)] sm:w-48"
+          />
           <button
             onClick={() => checkAvailability()}
             disabled={!checkDate || checkDate.length !== 8}
@@ -889,45 +982,45 @@ export function UpdatePage() {
         </div>
       )}
 
-	      {mode === 'wait' && waitJobUi && waitJob && (
-	        <div
-	          className={`rounded-lg p-4 ${
-	            waitJobUi.tone === 'success'
-	              ? 'bg-green-50'
-	              : waitJobUi.tone === 'info'
-	                ? 'bg-[color:var(--sf-primary-50)]'
-	                : waitJobUi.tone === 'warning'
-	                  ? 'bg-yellow-50'
-	                  : 'bg-red-50'
-	          }`}
-	        >
+        {mode === 'wait' && waitJobUi && waitJob && (
+          <div
+            className={`rounded-lg p-4 ${
+              waitJobUi.tone === 'success'
+                ? 'bg-green-50'
+                : waitJobUi.tone === 'info'
+                  ? 'bg-[color:var(--sf-primary-50)]'
+                  : waitJobUi.tone === 'warning'
+                    ? 'bg-yellow-50'
+                    : 'bg-red-50'
+            }`}
+          >
           <div className="flex items-start gap-3">
             {waitJobUi.icon}
             <div className="min-w-0">
               <p
-	                className={`text-sm font-medium ${
-	                  waitJobUi.tone === 'success'
-	                    ? 'text-green-800'
-	                    : waitJobUi.tone === 'info'
-	                      ? 'text-[color:var(--sf-primary-800)]'
-	                      : waitJobUi.tone === 'warning'
-	                        ? 'text-yellow-800'
-	                        : 'text-red-800'
-	                }`}
-	              >
+                  className={`text-sm font-medium ${
+                    waitJobUi.tone === 'success'
+                      ? 'text-green-800'
+                      : waitJobUi.tone === 'info'
+                        ? 'text-[color:var(--sf-primary-800)]'
+                        : waitJobUi.tone === 'warning'
+                          ? 'text-yellow-800'
+                          : 'text-red-800'
+                  }`}
+                >
                 {waitJobUi.title}
               </p>
               <p
-	                className={`mt-1 text-sm ${
-	                  waitJobUi.tone === 'success'
-	                    ? 'text-green-700'
-	                    : waitJobUi.tone === 'info'
-	                      ? 'text-[color:var(--sf-primary-700)]'
-	                      : waitJobUi.tone === 'warning'
-	                        ? 'text-yellow-700'
-	                        : 'text-red-700'
-	                }`}
-	              >
+                  className={`mt-1 text-sm ${
+                    waitJobUi.tone === 'success'
+                      ? 'text-green-700'
+                      : waitJobUi.tone === 'info'
+                        ? 'text-[color:var(--sf-primary-700)]'
+                        : waitJobUi.tone === 'warning'
+                          ? 'text-yellow-700'
+                          : 'text-red-700'
+                  }`}
+                >
                 目标日期: {formatDate(waitJob.target_date)} | 提供商: {waitJob.provider} | 尝试次数: {waitJob.attempts} | 耗时: {waitJob.elapsed_seconds.toFixed(1)}秒
               </p>
               {waitJob.status === 'running' && waitJobProgress && (
