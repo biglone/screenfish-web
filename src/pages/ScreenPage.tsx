@@ -1,20 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import {
-  useAutoScreenConfig,
-  useDataIntegrity,
-  useExportEbk,
-  useHealth,
-  useRunAutoScreen,
-  useScreenMutation,
-  useUpdateAutoScreenConfig,
-} from '../hooks/useApi';
+import { useDataIntegrity, useExportEbk, useHealth, useScreenMutation } from '../hooks/useApi';
 import { useMe } from '../hooks/useAuth';
 import api from '../api/client';
 import type { ScreenRequest, ScreenHit, WatchlistItem } from '../types/api';
 import { StockDetail } from '../components/StockDetail';
 import { useWatchlist } from '../hooks/useWatchlist';
 import { usePriceAdjust, type PriceAdjustMode } from '../hooks/usePriceAdjust';
+import { AutoScreenConfigsPanel } from '../components/AutoScreenConfigsPanel';
 import {
   Search,
   Download,
@@ -24,15 +17,10 @@ import {
   ChevronUp,
   CheckSquare,
   Square,
-  Save,
-  RefreshCw,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export function ScreenPage() {
-  const AUTO_RUN_STORAGE_KEY = 'screenfish_screen_auto_run';
-  const AUTO_RUN_ALLOW_INCOMPLETE_STORAGE_KEY = 'screenfish_screen_auto_run_allow_incomplete';
-
   const [priceAdjust, setPriceAdjust] = usePriceAdjust();
   const [formData, setFormData] = useState<ScreenRequest>({
     date: 'latest',
@@ -49,25 +37,6 @@ export function ScreenPage() {
   const [targetGroupId, setTargetGroupId] = useState<string>('');
   const [watchlistBusy, setWatchlistBusy] = useState(false);
   const [watchlistError, setWatchlistError] = useState<string | null>(null);
-  const [autoScreenEnabledDraft, setAutoScreenEnabledDraft] = useState<boolean | null>(null);
-  const [autoScreenGroupNameDraft, setAutoScreenGroupNameDraft] = useState<string | null>(null);
-  const [autoScreenReplaceGroupDraft, setAutoScreenReplaceGroupDraft] = useState<boolean | null>(null);
-  const [autoScreenSavedAt, setAutoScreenSavedAt] = useState<number | null>(null);
-  const [autoRun, setAutoRun] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem(AUTO_RUN_STORAGE_KEY) === '1';
-    } catch {
-      return false;
-    }
-  });
-  const [autoRunAllowIncomplete, setAutoRunAllowIncomplete] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem(AUTO_RUN_ALLOW_INCOMPLETE_STORAGE_KEY) === '1';
-    } catch {
-      return false;
-    }
-  });
-  const [autoRunPausedReason, setAutoRunPausedReason] = useState<string | null>(null);
 
   const { groups, createGroup, addItems } = useWatchlist();
 
@@ -91,14 +60,9 @@ export function ScreenPage() {
 
   const screenMutation = useScreenMutation();
   const exportMutation = useExportEbk();
-  const autoScreenConfigQuery = useAutoScreenConfig(isAdmin);
-  const updateAutoScreenConfigMutation = useUpdateAutoScreenConfig();
-  const runAutoScreenMutation = useRunAutoScreen();
 
   const screenPendingRef = useRef(false);
   const screenQueueRef = useRef<{ key: string; request: ScreenRequest } | null>(null);
-  const autoRunTimerRef = useRef<number | null>(null);
-  const lastAutoKeyRef = useRef<string | null>(null);
 
   const enabledFormulas = formulasData?.formulas ?? [];
   const hits = screenMutation.data?.hits ?? [];
@@ -106,22 +70,6 @@ export function ScreenPage() {
   useEffect(() => {
     screenPendingRef.current = screenMutation.isPending;
   }, [screenMutation.isPending]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(AUTO_RUN_STORAGE_KEY, autoRun ? '1' : '0');
-    } catch {
-      // ignore
-    }
-  }, [autoRun]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(AUTO_RUN_ALLOW_INCOMPLETE_STORAGE_KEY, autoRunAllowIncomplete ? '1' : '0');
-    } catch {
-      // ignore
-    }
-  }, [autoRunAllowIncomplete]);
 
   const availableTradeDates = tradeDatesQuery.data?.dates ?? [];
   const rawDate = String(formData.date ?? 'latest').trim() || 'latest';
@@ -151,13 +99,6 @@ export function ScreenPage() {
     return arr.join(',');
   }, [selectedFormulas]);
 
-  const autoScreenEnabled = autoScreenEnabledDraft ?? autoScreenConfigQuery.data?.enabled ?? false;
-  const autoScreenGroupName = autoScreenGroupNameDraft ?? autoScreenConfigQuery.data?.group_name ?? '自动筛选';
-  const autoScreenReplaceGroup = autoScreenReplaceGroupDraft ?? autoScreenConfigQuery.data?.replace_group ?? true;
-  const autoScreenCanSave =
-    isAdmin &&
-    autoScreenGroupName.trim().length > 0 &&
-    (enabledFormulas.length === 0 || selectedFormulas.size > 0);
 
   const runScreenQueued = useCallback(
     (item: { key: string; request: ScreenRequest }) => {
@@ -177,30 +118,6 @@ export function ScreenPage() {
     },
     [screenMutation]
   );
-
-  const handleSaveAutoScreen = () => {
-    updateAutoScreenConfigMutation.mutate(
-      {
-        enabled: autoScreenEnabled,
-        group_name: autoScreenGroupName,
-        combo: (formData.combo ?? 'and') as 'and' | 'or',
-        rules: selectedRules.trim() ? selectedRules.trim() : null,
-        lookback_days: Math.max(0, Math.round(formData.lookback_days ?? 200)),
-        with_name: !!formData.with_name,
-        exclude_st: !!formData.exclude_st,
-        price_adjust: priceAdjust,
-        replace_group: autoScreenReplaceGroup,
-      },
-      {
-        onSuccess: () => {
-          setAutoScreenEnabledDraft(null);
-          setAutoScreenGroupNameDraft(null);
-          setAutoScreenReplaceGroupDraft(null);
-          setAutoScreenSavedAt(Date.now());
-        },
-      }
-    );
-  };
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -241,61 +158,6 @@ export function ScreenPage() {
     setSelectedHits(new Set());
     setActiveTsCode(screenMutation.data.hits[0]?.ts_code ?? null);
   }, [screenMutation.data]);
-
-  useEffect(() => {
-    if (!autoRun) {
-      setAutoRunPausedReason(null);
-      if (autoRunTimerRef.current) {
-        window.clearTimeout(autoRunTimerRef.current);
-        autoRunTimerRef.current = null;
-      }
-      return;
-    }
-    if (!selectedRules) return;
-
-    const ok = integrityQuery.data ? integrityQuery.data.ok : true;
-    if (!ok && !autoRunAllowIncomplete) {
-      setAutoRunPausedReason('数据可能不完整，已暂停自动筛选（可在下方勾选允许继续）');
-      return;
-    }
-    setAutoRunPausedReason(null);
-
-    const date = String(formData.date ?? 'latest').trim() || 'latest';
-    const combo = String(formData.combo ?? 'and');
-    const lookback = String(formData.lookback_days ?? 200);
-    const withName = formData.with_name ? '1' : '0';
-    const excludeSt = formData.exclude_st ? '1' : '0';
-    const adjust = priceAdjust;
-    const key = [date, combo, lookback, withName, excludeSt, selectedRules, adjust].join('|');
-
-    if (lastAutoKeyRef.current === key) return;
-
-    if (autoRunTimerRef.current) window.clearTimeout(autoRunTimerRef.current);
-    autoRunTimerRef.current = window.setTimeout(() => {
-      lastAutoKeyRef.current = key;
-      runScreenQueued({
-        key,
-        request: { ...formData, rules: selectedRules || null, price_adjust: priceAdjust },
-      });
-    }, 450);
-
-    return () => {
-      if (autoRunTimerRef.current) window.clearTimeout(autoRunTimerRef.current);
-    };
-  }, [
-    autoRun,
-    autoRunAllowIncomplete,
-    integrityQuery.data?.ok,
-    formData,
-    priceAdjust,
-    selectedRules,
-    runScreenQueued,
-  ]);
-
-  useEffect(() => {
-    if (!autoRun) return;
-    lastAutoKeyRef.current = null;
-  }, [autoRun]);
 
   const selectedHitItems = useMemo(() => {
     if (!screenMutation.data) return [];
@@ -355,12 +217,6 @@ export function ScreenPage() {
       const msg = `数据可能不完整（缺失更新日志 ${integrityQuery.data.missing_update_log_count}，缺失日线 ${integrityQuery.data.missing_daily_count}，异常 ${integrityQuery.data.suspicious_daily_count}），仍要继续筛选？`;
       if (!window.confirm(msg)) return;
     }
-
-    if (autoRunTimerRef.current) {
-      window.clearTimeout(autoRunTimerRef.current);
-      autoRunTimerRef.current = null;
-    }
-    lastAutoKeyRef.current = key;
     runScreenQueued({ key, request });
   };
 
@@ -738,37 +594,11 @@ export function ScreenPage() {
         )}
 
         {/* Actions */}
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-col gap-2 text-sm text-gray-700">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={autoRun}
-                onChange={(e) => setAutoRun(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 accent-[color:var(--sf-primary-600)] focus:ring-[color:var(--sf-primary-500)]"
-              />
-              配置变更后自动筛选（无需点按钮）
-            </label>
-
-            {autoRun && (
-              <label className="flex items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={autoRunAllowIncomplete}
-                  onChange={(e) => setAutoRunAllowIncomplete(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300 accent-[color:var(--sf-primary-600)] focus:ring-[color:var(--sf-primary-500)]"
-                />
-                数据不完整也自动筛选
-              </label>
-            )}
-
-            {autoRunPausedReason && <div className="text-xs text-amber-700">{autoRunPausedReason}</div>}
-          </div>
-
+        <div className="mt-6 flex justify-end">
           <button
             onClick={handleScreen}
             disabled={screenMutation.isPending || selectedFormulas.size === 0}
-            className="inline-flex items-center justify-center gap-2 rounded-md bg-[color:var(--sf-primary-600)] px-4 py-2 text-white hover:bg-[color:var(--sf-primary-700)] disabled:bg-[color:var(--sf-primary-400)] sm:w-auto"
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-[color:var(--sf-primary-600)] px-4 py-2 text-white hover:bg-[color:var(--sf-primary-700)] disabled:bg-[color:var(--sf-primary-400)]"
           >
             {screenMutation.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -784,161 +614,23 @@ export function ScreenPage() {
         )}
       </div>
 
-      {/* Auto Screen Config */}
-      <div className="rounded-lg bg-white p-6 shadow">
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">自动筛选（更新成功后自动写入分组）</h2>
+      <AutoScreenConfigsPanel
+        isAdmin={isAdmin}
+        title="自动筛选（更新成功后自动写入分组）"
+        headerExtra={
           <Link to="/update" className="text-sm text-gray-500 hover:text-gray-700">
             在更新页也可配置
           </Link>
-        </div>
-
-        {!isAdmin ? (
-          <div className="rounded-lg bg-gray-50 p-4 text-sm text-gray-700">
-            该功能需要管理员权限（用于保存配置并在后台自动写入分组）。
-          </div>
-        ) : (
-          <>
-            {(autoScreenConfigQuery.isLoading || autoScreenConfigQuery.isFetching) && (
-              <div className="mb-4 flex items-center gap-2 text-sm text-gray-500">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                加载中...
-              </div>
-            )}
-
-            {autoScreenConfigQuery.error && (
-              <div className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-                读取自动筛选配置失败：{(autoScreenConfigQuery.error as Error).message}
-              </div>
-            )}
-
-            {updateAutoScreenConfigMutation.error && (
-              <div className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-                保存自动筛选配置失败：{(updateAutoScreenConfigMutation.error as Error).message}
-              </div>
-            )}
-
-            {runAutoScreenMutation.error && (
-              <div className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-                执行自动筛选失败：{(runAutoScreenMutation.error as Error).message}
-              </div>
-            )}
-
-            {autoScreenConfigQuery.data?.last_error && (
-              <div className="mb-4 rounded-md bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
-                上次失败：{autoScreenConfigQuery.data.last_error}
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">启用</label>
-                <label className="mt-2 flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={autoScreenEnabled}
-                    onChange={(e) => setAutoScreenEnabledDraft(e.target.checked)}
-                    disabled={!autoScreenConfigQuery.data || updateAutoScreenConfigMutation.isPending}
-                    className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
-                  />
-                  自动筛选（更新成功后执行）
-                </label>
-                <div className="mt-1 text-xs text-gray-500">自动运行的日期为更新完成的最新交易日。</div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">分组名称</label>
-                <input
-                  type="text"
-                  value={autoScreenGroupName}
-                  onChange={(e) => setAutoScreenGroupNameDraft(e.target.value)}
-                  disabled={!autoScreenConfigQuery.data || updateAutoScreenConfigMutation.isPending}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
-                />
-                <div className="mt-1 text-xs text-gray-500">不存在则创建；存在则写入该分组。</div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">覆盖分组</label>
-                <label className="mt-2 flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={autoScreenReplaceGroup}
-                    onChange={(e) => setAutoScreenReplaceGroupDraft(e.target.checked)}
-                    disabled={!autoScreenConfigQuery.data || updateAutoScreenConfigMutation.isPending}
-                    className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
-                  />
-                  替换旧结果
-                </label>
-                <div className="mt-1 text-xs text-gray-500">关闭则会在原分组中追加。</div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">当前公式组合</label>
-                <div className="mt-1 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-                  <div className="truncate">
-                    {enabledFormulas.length > 0 && selectedFormulas.size === 0
-                      ? '未选择公式（会被视为使用全部启用公式）'
-                      : `已选择 ${selectedFormulas.size} 个公式`}
-                  </div>
-                  <div className="mt-1 text-xs text-gray-500">
-                    组合：{formData.combo} | 赋权：{priceAdjust} | 回溯：{formData.lookback_days} | 剔除ST：
-                    {formData.exclude_st ? '是' : '否'} | 显示名称：{formData.with_name ? '是' : '否'}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {enabledFormulas.length > 0 && selectedFormulas.size === 0 && autoScreenEnabled && (
-              <div className="mt-3 text-sm text-amber-700">建议至少选择一个公式，避免“全量公式”导致结果不可控。</div>
-            )}
-
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <button
-                type="button"
-                onClick={handleSaveAutoScreen}
-                disabled={!autoScreenConfigQuery.data || updateAutoScreenConfigMutation.isPending || !autoScreenCanSave}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[color:var(--sf-primary-600)] px-4 py-2 text-white hover:bg-[color:var(--sf-primary-700)] disabled:bg-[color:var(--sf-primary-400)] sm:w-auto"
-              >
-                {updateAutoScreenConfigMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4" />
-                )}
-                保存配置
-              </button>
-
-              <button
-                type="button"
-                onClick={() => runAutoScreenMutation.mutate({ date: 'latest', force: false })}
-                disabled={!autoScreenConfigQuery.data || runAutoScreenMutation.isPending}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50 disabled:bg-gray-100 sm:w-auto"
-              >
-                {runAutoScreenMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4" />
-                )}
-                立即执行一次（写入分组）
-              </button>
-            </div>
-
-            {autoScreenSavedAt && (
-              <div className="mt-3 text-xs text-green-700">已保存（{new Date(autoScreenSavedAt).toLocaleString()}）</div>
-            )}
-
-            {autoScreenConfigQuery.data && (
-              <div className="mt-4 text-xs text-gray-600">
-                上次执行：
-                {autoScreenConfigQuery.data.last_trade_date
-                  ? `${autoScreenConfigQuery.data.last_trade_date}（命中 ${autoScreenConfigQuery.data.last_count ?? 0}）`
-                  : '—'}
-                {autoScreenConfigQuery.data.group_id ? ` | 分组ID: ${autoScreenConfigQuery.data.group_id}` : ''}
-              </div>
-            )}
-          </>
-        )}
-      </div>
+        }
+        getCreateDefaults={() => ({
+          combo: (formData.combo ?? 'and') as 'and' | 'or',
+          rules: selectedRules.trim() ? selectedRules.trim() : null,
+          lookback_days: Math.max(0, Math.round(formData.lookback_days ?? 200)),
+          with_name: !!formData.with_name,
+          exclude_st: !!formData.exclude_st,
+          price_adjust: priceAdjust,
+        })}
+      />
 
       {/* Error */}
       {screenMutation.error && (
