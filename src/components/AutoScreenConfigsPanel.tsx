@@ -32,6 +32,15 @@ export function AutoScreenConfigsPanel({
   const [autoScreenSavedAt, setAutoScreenSavedAt] = useState<Record<string, number>>({});
 
   const autoScreenConfigs = autoScreenConfigsQuery.data?.configs ?? [];
+  const enabledCount = autoScreenConfigs.filter((item) => item.enabled).length;
+
+  const formatTradeDate = (value: string | null | undefined) => {
+    if (!value) return '-';
+    if (value.length === 8) {
+      return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`;
+    }
+    return value;
+  };
 
   const updateAutoScreenDraft = (configId: string, patch: Partial<AutoScreenConfig>) => {
     setAutoScreenDrafts((prev) => ({
@@ -117,7 +126,14 @@ export function AutoScreenConfigsPanel({
   return (
     <div className="rounded-lg bg-white p-6 shadow">
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+          {isAdmin && (
+            <div className="mt-1 text-xs text-gray-500">
+              共 {autoScreenConfigs.length} 条 | 启用 {enabledCount} 条
+            </div>
+          )}
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           {headerExtra}
           {isAdmin && (
@@ -199,11 +215,41 @@ export function AutoScreenConfigsPanel({
               const replaceGroup = draft.replace_group ?? config.replace_group ?? true;
               const canSave = groupName.trim().length > 0 && !updateAutoScreenConfigItemMutation.isPending;
               const savedAt = autoScreenSavedAt[configId];
+              const lastTradeDate = formatTradeDate(config.last_trade_date);
+              const lastCount = config.last_count ?? 0;
 
               return (
-                <div key={configId} className="rounded-lg border border-gray-200 p-4">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="text-sm font-semibold text-gray-900">配置 {index + 1}</div>
+                <div key={configId} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="text-sm font-semibold text-gray-900">配置 {index + 1}</div>
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-xs ${
+                            enabled
+                              ? 'border-green-200 bg-green-50 text-green-700'
+                              : 'border-gray-200 bg-gray-100 text-gray-600'
+                          }`}
+                        >
+                          {enabled ? '启用' : '停用'}
+                        </span>
+                        <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-600">
+                          {priceAdjust.toUpperCase()}
+                        </span>
+                        <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-600">
+                          {combo.toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500">
+                        上次执行 {lastTradeDate} | 命中 {lastCount}
+                        {config.group_id ? ` | 分组ID: ${config.group_id}` : ''}
+                      </div>
+                      {savedAt && (
+                        <div className="mt-1 text-xs text-green-700">
+                          已保存（{new Date(savedAt).toLocaleString()}）
+                        </div>
+                      )}
+                    </div>
                     <button
                       type="button"
                       onClick={() => {
@@ -223,115 +269,125 @@ export function AutoScreenConfigsPanel({
                     </div>
                   )}
 
-                  <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">启用</label>
-                      <label className="mt-2 flex items-center gap-2 text-sm text-gray-700">
-                        <input
-                          type="checkbox"
-                          checked={enabled}
-                          onChange={(e) => updateAutoScreenDraft(configId, { enabled: e.target.checked })}
-                          className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
+                  <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
+                    <div className="lg:col-span-8">
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">启用</label>
+                          <label className="mt-2 flex items-center gap-2 text-sm text-gray-700">
+                            <input
+                              type="checkbox"
+                              checked={enabled}
+                              onChange={(e) => updateAutoScreenDraft(configId, { enabled: e.target.checked })}
+                              className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
+                            />
+                            自动筛选（更新成功后执行）
+                          </label>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">分组名称</label>
+                          <input
+                            type="text"
+                            value={groupName}
+                            onChange={(e) => updateAutoScreenDraft(configId, { group_name: e.target.value })}
+                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                          />
+                          <div className="mt-1 text-xs text-gray-500">分组名会自动追加交易日期。</div>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">赋权模式</label>
+                          <select
+                            value={priceAdjust}
+                            onChange={(e) =>
+                              updateAutoScreenDraft(configId, {
+                                price_adjust: e.target.value as 'none' | 'qfq' | 'hfq',
+                              })
+                            }
+                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                          >
+                            <option value="qfq">前复权（qfq）</option>
+                            <option value="hfq">后复权（hfq）</option>
+                            <option value="none">不复权（none）</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">组合方式</label>
+                          <select
+                            value={combo}
+                            onChange={(e) => updateAutoScreenDraft(configId, { combo: e.target.value as 'and' | 'or' })}
+                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                          >
+                            <option value="and">AND（全部满足）</option>
+                            <option value="or">OR（满足任意）</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">回溯天数</label>
+                          <input
+                            type="number"
+                            value={lookbackDays}
+                            onChange={(e) => {
+                              const v = parseInt(e.target.value, 10);
+                              updateAutoScreenDraft(configId, {
+                                lookback_days: Number.isNaN(v) ? 200 : Math.max(0, v),
+                              });
+                            }}
+                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-gray-700">规则（逗号分隔）</label>
+                        <textarea
+                          value={rules}
+                          onChange={(e) => updateAutoScreenDraft(configId, { rules: e.target.value })}
+                          rows={2}
+                          placeholder="例如：公式A,公式B（留空表示使用全部启用的公式；若无则使用内置规则）"
+                          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
                         />
-                        自动筛选（更新成功后执行）
-                      </label>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">分组名称</label>
-                      <input
-                        type="text"
-                        value={groupName}
-                        onChange={(e) => updateAutoScreenDraft(configId, { group_name: e.target.value })}
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
-                      />
-                      <div className="mt-1 text-xs text-gray-500">分组名会自动追加交易日期。</div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">赋权模式</label>
-                      <select
-                        value={priceAdjust}
-                        onChange={(e) =>
-                          updateAutoScreenDraft(configId, { price_adjust: e.target.value as 'none' | 'qfq' | 'hfq' })
-                        }
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
-                      >
-                        <option value="qfq">前复权（qfq）</option>
-                        <option value="hfq">后复权（hfq）</option>
-                        <option value="none">不复权（none）</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">组合方式</label>
-                      <select
-                        value={combo}
-                        onChange={(e) => updateAutoScreenDraft(configId, { combo: e.target.value as 'and' | 'or' })}
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
-                      >
-                        <option value="and">AND（全部满足）</option>
-                        <option value="or">OR（满足任意）</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">回溯天数</label>
-                      <input
-                        type="number"
-                        value={lookbackDays}
-                        onChange={(e) => {
-                          const v = parseInt(e.target.value, 10);
-                          updateAutoScreenDraft(configId, { lookback_days: Number.isNaN(v) ? 200 : Math.max(0, v) });
-                        }}
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">选项</label>
-                      <div className="mt-2 space-y-2 text-sm text-gray-700">
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={excludeSt}
-                            onChange={(e) => updateAutoScreenDraft(configId, { exclude_st: e.target.checked })}
-                            className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
-                          />
-                          剔除 ST
-                        </label>
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={withName}
-                            onChange={(e) => updateAutoScreenDraft(configId, { with_name: e.target.checked })}
-                            className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
-                          />
-                          写入名称
-                        </label>
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={replaceGroup}
-                            onChange={(e) => updateAutoScreenDraft(configId, { replace_group: e.target.checked })}
-                            className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
-                          />
-                          覆盖分组（替换旧结果）
-                        </label>
+                        <div className="mt-1 text-xs text-gray-500">
+                          规则会在保存时校验（内置规则如 midline_ma60/kdj_oversold 也可用）。
+                        </div>
                       </div>
                     </div>
 
-                    <div className="sm:col-span-2 lg:col-span-3">
-                      <label className="block text-sm font-medium text-gray-700">规则（逗号分隔）</label>
-                      <textarea
-                        value={rules}
-                        onChange={(e) => updateAutoScreenDraft(configId, { rules: e.target.value })}
-                        rows={2}
-                        placeholder="例如：公式A,公式B（留空表示使用全部启用的公式；若无则使用内置规则）"
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
-                      />
-                      <div className="mt-1 text-xs text-gray-500">
-                        规则会在保存时校验（内置规则如 midline_ma60/kdj_oversold 也可用）。
+                    <div className="lg:col-span-4">
+                      <div className="rounded-md border border-gray-100 bg-gray-50 p-3">
+                        <div className="text-xs font-semibold text-gray-600">选项</div>
+                        <div className="mt-2 space-y-2 text-sm text-gray-700">
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={excludeSt}
+                              onChange={(e) => updateAutoScreenDraft(configId, { exclude_st: e.target.checked })}
+                              className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
+                            />
+                            剔除 ST
+                          </label>
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={withName}
+                              onChange={(e) => updateAutoScreenDraft(configId, { with_name: e.target.checked })}
+                              className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
+                            />
+                            写入名称
+                          </label>
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={replaceGroup}
+                              onChange={(e) => updateAutoScreenDraft(configId, { replace_group: e.target.checked })}
+                              className="h-4 w-4 accent-[color:var(--sf-primary-600)]"
+                            />
+                            覆盖分组（替换旧结果）
+                          </label>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -353,7 +409,9 @@ export function AutoScreenConfigsPanel({
 
                     <button
                       type="button"
-                      onClick={() => runAutoScreenMutation.mutate({ date: 'latest', force: false, config_id: configId })}
+                      onClick={() =>
+                        runAutoScreenMutation.mutate({ date: 'latest', force: false, config_id: configId })
+                      }
                       disabled={runAutoScreenMutation.isPending}
                       className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50 disabled:bg-gray-100 sm:w-auto"
                     >
@@ -364,16 +422,6 @@ export function AutoScreenConfigsPanel({
                       )}
                       立即执行一次
                     </button>
-                  </div>
-
-                  {savedAt && (
-                    <div className="mt-3 text-xs text-green-700">已保存（{new Date(savedAt).toLocaleString()}）</div>
-                  )}
-
-                  <div className="mt-3 text-xs text-gray-600">
-                    上次执行：
-                    {config.last_trade_date ? `${config.last_trade_date}（命中 ${config.last_count ?? 0}）` : '—'}
-                    {config.group_id ? ` | 分组ID: ${config.group_id}` : ''}
                   </div>
                 </div>
               );
