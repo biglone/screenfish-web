@@ -313,240 +313,228 @@ export function ScreenPage() {
         </div>
       ) : null}
 
-      {/* Formula Selection */}
+      {/* Screen Config */}
       <div className="rounded-lg bg-white p-6 shadow">
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">选择筛选公式</h2>
-          <div className="flex flex-wrap items-center gap-4">
-	            {enabledFormulas.length > 0 && (
-	              <button
-	                onClick={handleSelectAll}
-	                className="text-sm text-[color:var(--sf-primary-600)] hover:text-[color:var(--sf-primary-800)]"
-	              >
-	                {selectedFormulas.size === enabledFormulas.length
-	                  ? '取消全选'
-	                  : '全选'}
-	              </button>
-            )}
-            <Link
-              to="/formulas"
-              className="text-sm text-gray-500 hover:text-gray-700"
-            >
-              管理公式
-            </Link>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">筛选配置</h2>
+            <p className="mt-1 text-xs text-gray-500">用于自动筛选配置的公式与参数组合。</p>
           </div>
+          <Link to="/formulas" className="text-sm text-gray-500 hover:text-gray-700">
+            管理公式
+          </Link>
         </div>
 
-        {formulasLoading ? (
-          <div className="flex justify-center py-4">
-            <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+        <div className="mt-5 grid gap-6 lg:grid-cols-12">
+          <div className="lg:col-span-7">
+            <div className="rounded-md border border-gray-100 bg-gray-50 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="text-sm font-semibold text-gray-900">筛选公式</div>
+                <div className="flex items-center gap-3 text-sm">
+                  <span className="text-gray-500">已选 {selectedFormulas.size}</span>
+                  {enabledFormulas.length > 0 && (
+                    <button
+                      onClick={handleSelectAll}
+                      className="text-[color:var(--sf-primary-600)] hover:text-[color:var(--sf-primary-800)]"
+                    >
+                      {selectedFormulas.size === enabledFormulas.length ? '取消全选' : '全选'}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {formulasLoading ? (
+                <div className="flex justify-center py-6">
+                  <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                </div>
+              ) : enabledFormulas.length === 0 ? (
+                <div className="mt-3 rounded-lg bg-yellow-50 p-4 text-sm text-yellow-800">
+                  暂无启用的公式。请先到{' '}
+                  <Link to="/formulas" className="font-medium text-yellow-900 underline">
+                    公式管理
+                  </Link>{' '}
+                  创建并启用公式。
+                </div>
+              ) : (
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {enabledFormulas.map((formula) => (
+                    <label
+                      key={formula.id}
+                      className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
+                        selectedFormulas.has(formula.name)
+                          ? 'border-[color:var(--sf-primary-500)] bg-[color:var(--sf-primary-50)]'
+                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleToggleFormula(formula.name)}
+                        className="mt-0.5 flex-shrink-0"
+                      >
+                        {selectedFormulas.has(formula.name) ? (
+                          <CheckSquare className="h-5 w-5 text-[color:var(--sf-primary-600)]" />
+                        ) : (
+                          <Square className="h-5 w-5 text-gray-400" />
+                        )}
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-gray-900">{formula.name}</div>
+                        {formula.description && (
+                          <div className="mt-1 truncate text-sm text-gray-500">{formula.description}</div>
+                        )}
+                        <div className="mt-1 truncate font-mono text-xs text-gray-400">
+                          {formula.formula.length > 50 ? `${formula.formula.slice(0, 50)}...` : formula.formula}
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
+              {selectedFormulas.size === 0 && enabledFormulas.length > 0 && (
+                <div className="mt-3 text-xs text-gray-500">留空表示使用全部启用公式。</div>
+              )}
+            </div>
           </div>
-        ) : enabledFormulas.length === 0 ? (
-          <div className="rounded-lg bg-yellow-50 p-4 text-sm text-yellow-800">
-            暂无启用的公式。请先到{' '}
-            <Link to="/formulas" className="font-medium text-yellow-900 underline">
-              公式管理
-            </Link>{' '}
-            创建并启用公式。
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {enabledFormulas.map((formula) => (
-	              <label
-	                key={formula.id}
-	                className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
-	                  selectedFormulas.has(formula.name)
-	                    ? 'border-[color:var(--sf-primary-500)] bg-[color:var(--sf-primary-50)]'
-	                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-	                }`}
-	              >
+
+          <div className="lg:col-span-5">
+            <div className="rounded-md border border-gray-100 bg-gray-50 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm font-semibold text-gray-900">筛选选项</div>
                 <button
                   type="button"
-                  onClick={() => handleToggleFormula(formula.name)}
-                  className="mt-0.5 flex-shrink-0"
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                  className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
                 >
-	                  {selectedFormulas.has(formula.name) ? (
-	                    <CheckSquare className="h-5 w-5 text-[color:var(--sf-primary-600)]" />
-	                  ) : (
-	                    <Square className="h-5 w-5 text-gray-400" />
-	                  )}
-                </button>
-                <div className="min-w-0 flex-1">
-                  <div className="font-medium text-gray-900">{formula.name}</div>
-                  {formula.description && (
-                    <div className="mt-1 truncate text-sm text-gray-500">
-                      {formula.description}
-                    </div>
+                  {showAdvanced ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
                   )}
-                  <div className="mt-1 truncate font-mono text-xs text-gray-400">
-                    {formula.formula.length > 50
-                      ? formula.formula.slice(0, 50) + '...'
-                      : formula.formula}
+                  高级选项
+                </button>
+              </div>
+
+              <div className="mt-3 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">筛选日期</label>
+                  <div className="mt-1 flex flex-col gap-2">
+                    <select
+                      value={quickDateValue}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (!v) return;
+                        setFormData({ ...formData, date: v });
+                      }}
+                      className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                    >
+                      <option value="">手动选择</option>
+                      <option value="latest">最新（自动）</option>
+                      {availableTradeDates.map((d) => (
+                        <option key={d} value={d}>
+                          {formatDate(d)}
+                        </option>
+                      ))}
+                    </select>
+
+                    <input
+                      type="date"
+                      value={dateInputValue}
+                      onChange={(e) => {
+                        const iso = e.target.value;
+                        if (!iso) {
+                          setFormData({ ...formData, date: 'latest' });
+                          return;
+                        }
+                        const v = iso.replaceAll('-', '');
+                        setFormData({ ...formData, date: v });
+                      }}
+                      className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                    />
+                  </div>
+                  <div className="mt-1 text-xs text-gray-500">
+                    {tradeDatesQuery.isLoading
+                      ? '交易日加载中...'
+                      : tradeDatesQuery.data
+                        ? `本地更新日志：${tradeDatesQuery.data.total} 个交易日`
+                        : tradeDatesQuery.error
+                          ? '交易日加载失败（仍可手动选择）'
+                          : '仍可手动选择交易日'}
                   </div>
                 </div>
-              </label>
-            ))}
-          </div>
-        )}
 
-        {selectedFormulas.size > 0 && (
-          <div className="mt-4 text-sm text-gray-500">
-            已选择 {selectedFormulas.size} 个公式
-          </div>
-        )}
-      </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">组合方式</label>
+                    <select
+                      value={formData.combo}
+                      onChange={(e) => setFormData({ ...formData, combo: e.target.value as 'and' | 'or' })}
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                    >
+                      <option value="and">AND（全部满足）</option>
+                      <option value="or">OR（任一满足）</option>
+                    </select>
+                  </div>
 
-      {/* Filter Options */}
-      <div className="rounded-lg bg-white p-6 shadow">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">筛选选项</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
-          <div className="sm:col-span-3">
-            <label className="block text-sm font-medium text-gray-700">
-              筛选日期
-            </label>
-            <div className="mt-1 flex flex-col gap-2 sm:flex-row">
-              <select
-                value={quickDateValue}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (!v) return;
-                  setFormData({ ...formData, date: v });
-                }}
-                className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)] sm:w-44"
-              >
-                <option value="">手动选择</option>
-                <option value="latest">最新（自动）</option>
-                {availableTradeDates.map((d) => (
-                  <option key={d} value={d}>
-                    {formatDate(d)}
-                  </option>
-                ))}
-              </select>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">复权模式</label>
+                    <select
+                      value={priceAdjust}
+                      onChange={(e) => setPriceAdjust(e.target.value as PriceAdjustMode)}
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                    >
+                      <option value="qfq">前复权（QFQ）</option>
+                      <option value="none">不复权</option>
+                      <option value="hfq">后复权（HFQ）</option>
+                    </select>
+                  </div>
+                </div>
 
-              <input
-                type="date"
-                value={dateInputValue}
-                onChange={(e) => {
-                  const iso = e.target.value;
-                  if (!iso) {
-                    setFormData({ ...formData, date: 'latest' });
-                    return;
-                  }
-                  const v = iso.replaceAll('-', '');
-                  setFormData({ ...formData, date: v });
-                }}
-                className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
-              />
+                <div className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    id="excludeSt"
+                    checked={!!formData.exclude_st}
+                    onChange={(e) => setFormData({ ...formData, exclude_st: e.target.checked })}
+                    className="h-4 w-4 rounded border-gray-300 accent-[color:var(--sf-primary-600)] focus:ring-[color:var(--sf-primary-500)]"
+                  />
+                  <label htmlFor="excludeSt">剔除ST股票</label>
+                </div>
+
+                {showAdvanced && (
+                  <div className="grid grid-cols-1 gap-3 border-t border-gray-200 pt-3 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">回溯天数</label>
+                      <input
+                        type="number"
+                        value={formData.lookback_days}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            lookback_days: parseInt(e.target.value) || 200,
+                          })
+                        }
+                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                      />
+                    </div>
+
+                    <div className="flex items-center pt-6">
+                      <input
+                        type="checkbox"
+                        id="withName"
+                        checked={formData.with_name}
+                        onChange={(e) => setFormData({ ...formData, with_name: e.target.checked })}
+                        className="h-4 w-4 rounded border-gray-300 accent-[color:var(--sf-primary-600)] focus:ring-[color:var(--sf-primary-500)]"
+                      />
+                      <label htmlFor="withName" className="ml-2 text-sm text-gray-700">
+                        显示股票名称
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="mt-1 text-xs text-gray-500">
-              {tradeDatesQuery.isLoading
-                ? '交易日加载中...'
-                : tradeDatesQuery.data
-                  ? `本地更新日志：${tradeDatesQuery.data.total} 个交易日`
-                  : tradeDatesQuery.error
-                    ? '交易日加载失败（仍可手动选择）'
-                    : '仍可手动选择交易日'}
-            </div>
-          </div>
-
-          <div className="sm:col-span-1">
-            <label className="block text-sm font-medium text-gray-700">
-              组合方式
-            </label>
-	            <select
-	              value={formData.combo}
-	              onChange={(e) =>
-	                setFormData({ ...formData, combo: e.target.value as 'and' | 'or' })
-	              }
-	              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
-	            >
-              <option value="and">AND（全部满足）</option>
-              <option value="or">OR（任一满足）</option>
-            </select>
-          </div>
-
-          <div className="sm:col-span-1">
-            <label className="block text-sm font-medium text-gray-700">
-              复权模式
-            </label>
-            <select
-              value={priceAdjust}
-              onChange={(e) => setPriceAdjust(e.target.value as PriceAdjustMode)}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
-            >
-              <option value="qfq">前复权（QFQ）</option>
-              <option value="none">不复权</option>
-              <option value="hfq">后复权（HFQ）</option>
-            </select>
-          </div>
-
-          <div className="flex items-end sm:col-span-1">
-            <button
-              type="button"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
-            >
-              {showAdvanced ? (
-                <ChevronUp className="h-4 w-4" />
-              ) : (
-                <ChevronDown className="h-4 w-4" />
-              )}
-              高级选项
-            </button>
           </div>
         </div>
-
-        <div className="mt-4 flex flex-wrap items-center gap-6">
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="excludeSt"
-              checked={!!formData.exclude_st}
-              onChange={(e) => setFormData({ ...formData, exclude_st: e.target.checked })}
-              className="h-4 w-4 rounded border-gray-300 accent-[color:var(--sf-primary-600)] focus:ring-[color:var(--sf-primary-500)]"
-            />
-            <label htmlFor="excludeSt" className="ml-2 text-sm text-gray-700">
-              剔除ST股票
-            </label>
-          </div>
-        </div>
-
-        {showAdvanced && (
-          <div className="mt-4 grid grid-cols-1 gap-4 border-t pt-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                回溯天数
-              </label>
-	              <input
-	                type="number"
-	                value={formData.lookback_days}
-	                onChange={(e) =>
-	                  setFormData({
-	                    ...formData,
-	                    lookback_days: parseInt(e.target.value) || 200,
-	                  })
-	                }
-	                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
-	              />
-            </div>
-
-            <div className="flex items-center pt-6">
-	              <input
-	                type="checkbox"
-	                id="withName"
-	                checked={formData.with_name}
-	                onChange={(e) =>
-	                  setFormData({ ...formData, with_name: e.target.checked })
-	                }
-	                className="h-4 w-4 rounded border-gray-300 accent-[color:var(--sf-primary-600)] focus:ring-[color:var(--sf-primary-500)]"
-	              />
-              <label htmlFor="withName" className="ml-2 text-sm text-gray-700">
-                显示股票名称
-              </label>
-            </div>
-          </div>
-        )}
-
       </div>
 
       <AutoScreenConfigsPanel
@@ -592,12 +580,12 @@ export function ScreenPage() {
 
               <div className="border-b border-gray-100 px-4 py-3">
                 <div className="flex flex-wrap items-center gap-3">
-	                  <button
-	                    type="button"
-	                    onClick={handleSelectAllHits}
-	                    className="text-sm text-[color:var(--sf-primary-600)] hover:text-[color:var(--sf-primary-800)]"
-	                    disabled={hits.length === 0}
-	                  >
+                    <button
+                      type="button"
+                      onClick={handleSelectAllHits}
+                      className="text-sm text-[color:var(--sf-primary-600)] hover:text-[color:var(--sf-primary-800)]"
+                      disabled={hits.length === 0}
+                    >
                     {selectedHits.size === hits.length && hits.length > 0 ? '取消全选' : '全选'}
                   </button>
                   <div className="text-sm text-gray-500">已选 {selectedHits.size}</div>
@@ -608,12 +596,12 @@ export function ScreenPage() {
                 </div>
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-	                  <select
-	                    value={targetGroupId}
-	                    onChange={(e) => setTargetGroupId(e.target.value)}
-	                    disabled={watchlistBusy || groups.length === 0}
-	                    className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
-	                  >
+                    <select
+                      value={targetGroupId}
+                      onChange={(e) => setTargetGroupId(e.target.value)}
+                      disabled={watchlistBusy || groups.length === 0}
+                      className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                    >
                     {groups.map((g) => (
                       <option key={g.id} value={g.id}>
                         {g.name}
@@ -621,12 +609,12 @@ export function ScreenPage() {
                     ))}
                   </select>
 
-	                  <button
-	                    type="button"
-	                    onClick={handleAddSelectedToGroup}
-	                    disabled={watchlistBusy || !targetGroupId || hits.length === 0}
-	                    className="h-9 rounded-md bg-[color:var(--sf-primary-600)] px-3 text-sm font-medium text-white hover:bg-[color:var(--sf-primary-700)] disabled:cursor-not-allowed disabled:bg-[color:var(--sf-primary-400)]"
-	                  >
+                    <button
+                      type="button"
+                      onClick={handleAddSelectedToGroup}
+                      disabled={watchlistBusy || !targetGroupId || hits.length === 0}
+                      className="h-9 rounded-md bg-[color:var(--sf-primary-600)] px-3 text-sm font-medium text-white hover:bg-[color:var(--sf-primary-700)] disabled:cursor-not-allowed disabled:bg-[color:var(--sf-primary-400)]"
+                    >
                     加入分组
                   </button>
 
@@ -668,17 +656,17 @@ export function ScreenPage() {
               ) : (
                 <div className="max-h-[720px] overflow-auto">
                   <ul className="divide-y divide-gray-100">
-	                    {hits.map((hit: ScreenHit) => {
-	                      const active = hit.ts_code === activeTsCode;
-	                      const selected = selectedHits.has(hit.ts_code);
-	                      return (
-	                        <li
-	                          key={hit.ts_code}
+                      {hits.map((hit: ScreenHit) => {
+                        const active = hit.ts_code === activeTsCode;
+                        const selected = selectedHits.has(hit.ts_code);
+                        return (
+                          <li
+                            key={hit.ts_code}
                               data-ts-code={hit.ts_code}
-	                          className={
-	                            active ? 'bg-[color:var(--sf-primary-50)]' : 'hover:bg-gray-50'
-	                          }
-	                        >
+                            className={
+                              active ? 'bg-[color:var(--sf-primary-50)]' : 'hover:bg-gray-50'
+                            }
+                          >
                           <div className="flex items-start gap-3 px-4 py-3">
                             <button
                               type="button"
@@ -686,11 +674,11 @@ export function ScreenPage() {
                               className="mt-0.5 flex-shrink-0"
                               title={selected ? '取消选择' : '选择'}
                             >
-	                              {selected ? (
-	                                <CheckSquare className="h-5 w-5 text-[color:var(--sf-primary-600)]" />
-	                              ) : (
-	                                <Square className="h-5 w-5 text-gray-400" />
-	                              )}
+                                {selected ? (
+                                  <CheckSquare className="h-5 w-5 text-[color:var(--sf-primary-600)]" />
+                                ) : (
+                                  <Square className="h-5 w-5 text-gray-400" />
+                                )}
                             </button>
 
                             <button
@@ -708,11 +696,11 @@ export function ScreenPage() {
                               </div>
                             </button>
 
-	                            <Link
-	                              to={`/stocks/${encodeURIComponent(hit.ts_code)}?price_adjust=${encodeURIComponent(priceAdjust)}`}
-	                              className="flex-shrink-0 text-sm text-[color:var(--sf-primary-600)] hover:text-[color:var(--sf-primary-800)]"
-	                              title="在新页面打开"
-	                            >
+                              <Link
+                                to={`/stocks/${encodeURIComponent(hit.ts_code)}?price_adjust=${encodeURIComponent(priceAdjust)}`}
+                                className="flex-shrink-0 text-sm text-[color:var(--sf-primary-600)] hover:text-[color:var(--sf-primary-800)]"
+                                title="在新页面打开"
+                              >
                               打开
                             </Link>
                           </div>
