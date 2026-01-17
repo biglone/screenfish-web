@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useDataIntegrity, useExportEbk, useHealth, useScreenMutation } from '../hooks/useApi';
+import {
+  useAutoScreenConfigs,
+  useCreateAutoScreenConfig,
+  useDataIntegrity,
+  useExportEbk,
+  useHealth,
+  useScreenMutation,
+} from '../hooks/useApi';
 import { useMe } from '../hooks/useAuth';
 import api from '../api/client';
 import type { ScreenRequest, ScreenHit, WatchlistItem } from '../types/api';
@@ -36,6 +43,7 @@ export function ScreenPage() {
   const [targetGroupId, setTargetGroupId] = useState<string>('');
   const [watchlistBusy, setWatchlistBusy] = useState(false);
   const [watchlistError, setWatchlistError] = useState<string | null>(null);
+  const [templateCreatedAt, setTemplateCreatedAt] = useState<number | null>(null);
 
   const { groups, createGroup, addItems } = useWatchlist();
 
@@ -50,29 +58,16 @@ export function ScreenPage() {
     queryFn: () => api.listFormulas({ enabledOnly: true, kind: 'screen' }),
   });
 
-  const tradeDatesQuery = useQuery({
-    queryKey: ['tradeDates', priceAdjust],
-    queryFn: () => api.listTradeDates({ limit: 260, order: 'desc', price_adjust: priceAdjust }),
-    staleTime: 60_000,
-    retry: false,
-  });
-
   const screenMutation = useScreenMutation();
   const exportMutation = useExportEbk();
+  const autoScreenConfigsQuery = useAutoScreenConfigs(isAdmin);
+  const createAutoScreenConfigMutation = useCreateAutoScreenConfig();
 
   const enabledFormulas = formulasData?.formulas ?? [];
   const hits = screenMutation.data?.hits ?? [];
 
-  const availableTradeDates = tradeDatesQuery.data?.dates ?? [];
-  const rawDate = String(formData.date ?? 'latest').trim() || 'latest';
-  const quickDateValue =
-    rawDate === 'latest' || availableTradeDates.includes(rawDate) ? rawDate : '';
-  const dateInputValue = /^\d{8}$/.test(rawDate)
-    ? `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`
-    : '';
-
-  const dateForIntegrity = String(formData.date ?? 'latest').trim() || 'latest';
-  const canCheckIntegrity = dateForIntegrity === 'latest' || /^\d{8}$/.test(dateForIntegrity);
+  const dateForIntegrity = 'latest';
+  const canCheckIntegrity = true;
   const integrityQuery = useDataIntegrity(
     {
       provider: 'baostock',
@@ -172,6 +167,29 @@ export function ScreenPage() {
     } else {
       setSelectedFormulas(new Set(enabledFormulas.map((f) => f.name)));
     }
+  };
+
+  const handleCreateFromTemplate = () => {
+    if (!isAdmin) return;
+    const nextIndex = (autoScreenConfigsQuery.data?.configs?.length ?? 0) + 1;
+    createAutoScreenConfigMutation.mutate(
+      {
+        enabled: true,
+        group_name: `自动筛选-${nextIndex}`,
+        combo: (formData.combo ?? 'and') as 'and' | 'or',
+        rules: selectedRules.trim() ? selectedRules.trim() : null,
+        lookback_days: Math.max(0, Math.round(formData.lookback_days ?? 200)),
+        with_name: !!formData.with_name,
+        exclude_st: !!formData.exclude_st,
+        price_adjust: priceAdjust,
+        replace_group: true,
+      },
+      {
+        onSuccess: () => {
+          setTemplateCreatedAt(Date.now());
+        },
+      }
+    );
   };
 
   const handleExport = () => {
@@ -317,13 +335,28 @@ export function ScreenPage() {
       <div className="rounded-lg bg-white p-6 shadow">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">筛选配置</h2>
-            <p className="mt-1 text-xs text-gray-500">用于自动筛选配置的公式与参数组合。</p>
+            <h2 className="text-lg font-semibold text-gray-900">新建配置模板</h2>
+            <p className="mt-1 text-xs text-gray-500">使用该模板一键生成自动筛选配置。</p>
           </div>
-          <Link to="/formulas" className="text-sm text-gray-500 hover:text-gray-700">
-            管理公式
-          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link to="/formulas" className="text-sm text-gray-500 hover:text-gray-700">
+              管理公式
+            </Link>
+            <button
+              type="button"
+              onClick={handleCreateFromTemplate}
+              disabled={!isAdmin || createAutoScreenConfigMutation.isPending}
+              className="rounded-md bg-[color:var(--sf-primary-600)] px-3 py-2 text-sm text-white hover:bg-[color:var(--sf-primary-700)] disabled:bg-[color:var(--sf-primary-400)]"
+            >
+              用模板新建配置
+            </button>
+          </div>
         </div>
+        {templateCreatedAt && (
+          <div className="mt-2 text-xs text-green-700">
+            已创建配置（{new Date(templateCreatedAt).toLocaleString()}）
+          </div>
+        )}
 
         <div className="mt-5 grid gap-6 lg:grid-cols-12">
           <div className="lg:col-span-7">
@@ -415,51 +448,8 @@ export function ScreenPage() {
               </div>
 
               <div className="mt-3 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">筛选日期</label>
-                  <div className="mt-1 flex flex-col gap-2">
-                    <select
-                      value={quickDateValue}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        if (!v) return;
-                        setFormData({ ...formData, date: v });
-                      }}
-                      className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
-                    >
-                      <option value="">手动选择</option>
-                      <option value="latest">最新（自动）</option>
-                      {availableTradeDates.map((d) => (
-                        <option key={d} value={d}>
-                          {formatDate(d)}
-                        </option>
-                      ))}
-                    </select>
-
-                    <input
-                      type="date"
-                      value={dateInputValue}
-                      onChange={(e) => {
-                        const iso = e.target.value;
-                        if (!iso) {
-                          setFormData({ ...formData, date: 'latest' });
-                          return;
-                        }
-                        const v = iso.replaceAll('-', '');
-                        setFormData({ ...formData, date: v });
-                      }}
-                      className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
-                    />
-                  </div>
-                  <div className="mt-1 text-xs text-gray-500">
-                    {tradeDatesQuery.isLoading
-                      ? '交易日加载中...'
-                      : tradeDatesQuery.data
-                        ? `本地更新日志：${tradeDatesQuery.data.total} 个交易日`
-                        : tradeDatesQuery.error
-                          ? '交易日加载失败（仍可手动选择）'
-                          : '仍可手动选择交易日'}
-                  </div>
+                <div className="rounded-md border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600">
+                  自动筛选使用更新完成的最新交易日。
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
