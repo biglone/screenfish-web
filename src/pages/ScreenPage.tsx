@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useDataIntegrity, useExportEbk, useHealth, useScreenMutation } from '../hooks/useApi';
 import { useMe } from '../hooks/useAuth';
@@ -9,7 +9,6 @@ import { useWatchlist } from '../hooks/useWatchlist';
 import { usePriceAdjust, type PriceAdjustMode } from '../hooks/usePriceAdjust';
 import { AutoScreenConfigsPanel } from '../components/AutoScreenConfigsPanel';
 import {
-  Search,
   Download,
   Loader2,
   Filter,
@@ -61,15 +60,8 @@ export function ScreenPage() {
   const screenMutation = useScreenMutation();
   const exportMutation = useExportEbk();
 
-  const screenPendingRef = useRef(false);
-  const screenQueueRef = useRef<{ key: string; request: ScreenRequest } | null>(null);
-
   const enabledFormulas = formulasData?.formulas ?? [];
   const hits = screenMutation.data?.hits ?? [];
-
-  useEffect(() => {
-    screenPendingRef.current = screenMutation.isPending;
-  }, [screenMutation.isPending]);
 
   const availableTradeDates = tradeDatesQuery.data?.dates ?? [];
   const rawDate = String(formData.date ?? 'latest').trim() || 'latest';
@@ -99,25 +91,6 @@ export function ScreenPage() {
     return arr.join(',');
   }, [selectedFormulas]);
 
-
-  const runScreenQueued = useCallback(
-    (item: { key: string; request: ScreenRequest }) => {
-      if (screenPendingRef.current) {
-        screenQueueRef.current = item;
-        return;
-      }
-      screenQueueRef.current = null;
-      screenPendingRef.current = true;
-      screenMutation.mutate(item.request, {
-        onSettled: () => {
-          screenPendingRef.current = false;
-          const next = screenQueueRef.current;
-          if (next) runScreenQueued(next);
-        },
-      });
-    },
-    [screenMutation]
-  );
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -199,25 +172,6 @@ export function ScreenPage() {
     } else {
       setSelectedFormulas(new Set(enabledFormulas.map((f) => f.name)));
     }
-  };
-
-  const handleScreen = () => {
-    if (selectedFormulas.size === 0 && enabledFormulas.length > 0) return;
-
-    const date = String(formData.date ?? 'latest').trim() || 'latest';
-    const combo = String(formData.combo ?? 'and');
-    const lookback = String(formData.lookback_days ?? 200);
-    const withName = formData.with_name ? '1' : '0';
-    const excludeSt = formData.exclude_st ? '1' : '0';
-    const adjust = priceAdjust;
-    const key = [date, combo, lookback, withName, excludeSt, selectedRules, adjust].join('|');
-    const request = { ...formData, rules: selectedRules || null, price_adjust: priceAdjust };
-
-    if (integrityQuery.data && !integrityQuery.data.ok) {
-      const msg = `数据可能不完整（缺失更新日志 ${integrityQuery.data.missing_update_log_count}，缺失日线 ${integrityQuery.data.missing_daily_count}，异常 ${integrityQuery.data.suspicious_daily_count}），仍要继续筛选？`;
-      if (!window.confirm(msg)) return;
-    }
-    runScreenQueued({ key, request });
   };
 
   const handleExport = () => {
@@ -445,12 +399,12 @@ export function ScreenPage() {
       {/* Filter Options */}
       <div className="rounded-lg bg-white p-6 shadow">
         <h2 className="mb-4 text-lg font-semibold text-gray-900">筛选选项</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-          <div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
+          <div className="sm:col-span-3">
             <label className="block text-sm font-medium text-gray-700">
               筛选日期
             </label>
-            <div className="mt-1 flex gap-2">
+            <div className="mt-1 flex flex-col gap-2 sm:flex-row">
               <select
                 value={quickDateValue}
                 onChange={(e) => {
@@ -458,7 +412,7 @@ export function ScreenPage() {
                   if (!v) return;
                   setFormData({ ...formData, date: v });
                 }}
-                className="block w-44 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)] sm:w-44"
               >
                 <option value="">手动选择</option>
                 <option value="latest">最新（自动）</option>
@@ -495,7 +449,7 @@ export function ScreenPage() {
             </div>
           </div>
 
-          <div>
+          <div className="sm:col-span-1">
             <label className="block text-sm font-medium text-gray-700">
               组合方式
             </label>
@@ -511,7 +465,7 @@ export function ScreenPage() {
             </select>
           </div>
 
-          <div>
+          <div className="sm:col-span-1">
             <label className="block text-sm font-medium text-gray-700">
               复权模式
             </label>
@@ -526,7 +480,7 @@ export function ScreenPage() {
             </select>
           </div>
 
-          <div className="flex items-end">
+          <div className="flex items-end sm:col-span-1">
             <button
               type="button"
               onClick={() => setShowAdvanced(!showAdvanced)}
@@ -593,25 +547,6 @@ export function ScreenPage() {
           </div>
         )}
 
-        {/* Actions */}
-        <div className="mt-6 flex justify-end">
-          <button
-            onClick={handleScreen}
-            disabled={screenMutation.isPending || selectedFormulas.size === 0}
-            className="inline-flex items-center justify-center gap-2 rounded-md bg-[color:var(--sf-primary-600)] px-4 py-2 text-white hover:bg-[color:var(--sf-primary-700)] disabled:bg-[color:var(--sf-primary-400)]"
-          >
-            {screenMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Search className="h-4 w-4" />
-            )}
-            手动筛选
-          </button>
-        </div>
-
-        {selectedFormulas.size === 0 && enabledFormulas.length > 0 && (
-          <p className="mt-2 text-sm text-amber-600">请至少选择一个公式</p>
-        )}
       </div>
 
       <AutoScreenConfigsPanel
