@@ -32,6 +32,14 @@ const BUILTIN_RULES = [
   },
 ];
 
+const countRules = (rules: string | null | undefined) => {
+  const tokens = String(rules ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return new Set(tokens).size;
+};
+
 export function AutoScreenConfigsPanel({
   isAdmin,
   title = '自动筛选设置',
@@ -52,6 +60,9 @@ export function AutoScreenConfigsPanel({
   const [rulePickerConfigId, setRulePickerConfigId] = useState<string | null>(null);
   const [rulePickerSelected, setRulePickerSelected] = useState<Set<string>>(new Set());
   const [rulePickerSearch, setRulePickerSearch] = useState('');
+  const [runMessages, setRunMessages] = useState<
+    Record<string, { type: 'success' | 'error'; text: string; at: number }>
+  >({});
 
   const autoScreenConfigs = autoScreenConfigsQuery.data?.configs ?? [];
   const formulas = formulasQuery.data?.formulas ?? [];
@@ -137,6 +148,13 @@ export function AutoScreenConfigsPanel({
     }));
   };
 
+  const setRunMessage = (configId: string, type: 'success' | 'error', text: string) => {
+    setRunMessages((prev) => ({
+      ...prev,
+      [configId]: { type, text, at: Date.now() },
+    }));
+  };
+
   const clearAutoScreenDraft = (configId: string) => {
     setAutoScreenDrafts((prev) => {
       const next = { ...prev };
@@ -175,13 +193,16 @@ export function AutoScreenConfigsPanel({
     if (!configId) return;
     const draft = autoScreenDrafts[configId] ?? {};
     const groupName = String(draft.group_name ?? config.group_name ?? '').trim();
+    const ruleCount = countRules(draft.rules ?? config.rules ?? '');
+    const comboValue = (draft.combo ?? config.combo ?? 'and') as 'and' | 'or';
+    const normalizedCombo = ruleCount === 1 ? 'and' : comboValue;
     updateAutoScreenConfigItemMutation.mutate(
       {
         configId,
         request: {
           enabled: (draft.enabled ?? config.enabled) ?? false,
           group_name: groupName || '自动筛选',
-          combo: (draft.combo ?? config.combo ?? 'and') as 'and' | 'or',
+          combo: normalizedCombo,
           rules: (draft.rules ?? config.rules ?? '').trim() ? (draft.rules ?? config.rules ?? '').trim() : null,
           lookback_days: Math.max(0, Math.round(draft.lookback_days ?? config.lookback_days ?? 200)),
           with_name: (draft.with_name ?? config.with_name ?? false) ?? false,
@@ -296,6 +317,9 @@ export function AutoScreenConfigsPanel({
               const groupName = String(draft.group_name ?? config.group_name ?? '自动筛选');
               const combo = (draft.combo ?? config.combo ?? 'and') as 'and' | 'or';
               const rules = String(draft.rules ?? config.rules ?? '');
+              const ruleCount = countRules(rules);
+              const comboDisabled = ruleCount === 1;
+              const comboLabel = comboDisabled ? 'AND' : combo.toUpperCase();
               const lookbackDays = Number(draft.lookback_days ?? config.lookback_days ?? 200);
               const excludeSt = draft.exclude_st ?? config.exclude_st ?? true;
               const withName = draft.with_name ?? config.with_name ?? false;
@@ -303,6 +327,7 @@ export function AutoScreenConfigsPanel({
               const replaceGroup = draft.replace_group ?? config.replace_group ?? true;
               const canSave = groupName.trim().length > 0 && !updateAutoScreenConfigItemMutation.isPending;
               const savedAt = autoScreenSavedAt[configId];
+              const runMessage = runMessages[configId];
               const lastTradeDate = formatTradeDate(config.last_trade_date);
               const lastCount = config.last_count ?? 0;
 
@@ -325,7 +350,7 @@ export function AutoScreenConfigsPanel({
                           {priceAdjust.toUpperCase()}
                         </span>
                         <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-600">
-                          {combo.toUpperCase()}
+                          {comboLabel}
                         </span>
                       </div>
                       <div className="mt-1 text-xs text-gray-500">
@@ -404,13 +429,17 @@ export function AutoScreenConfigsPanel({
                         <div>
                           <label className="block text-sm font-medium text-gray-700">组合方式</label>
                           <select
-                            value={combo}
+                            value={comboDisabled ? 'and' : combo}
                             onChange={(e) => updateAutoScreenDraft(configId, { combo: e.target.value as 'and' | 'or' })}
+                            disabled={comboDisabled}
                             className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
                           >
                             <option value="and">AND（全部满足）</option>
                             <option value="or">OR（满足任意）</option>
                           </select>
+                          {comboDisabled && (
+                            <div className="mt-1 text-xs text-gray-500">仅 1 条规则，组合方式不生效。</div>
+                          )}
                         </div>
 
                         <div>
@@ -510,7 +539,22 @@ export function AutoScreenConfigsPanel({
                     <button
                       type="button"
                       onClick={() =>
-                        runAutoScreenMutation.mutate({ date: 'latest', force: false, config_id: configId })
+                        (() => {
+                          setRunMessage(configId, 'success', '执行中...');
+                          runAutoScreenMutation.mutate(
+                            { date: 'latest', force: false, config_id: configId },
+                            {
+                              onSuccess: (data) => {
+                                const msg = data.message || `已执行 ${data.count} 只`;
+                                setRunMessage(configId, 'success', msg);
+                              },
+                              onError: (err) => {
+                                const msg = err instanceof Error ? err.message : String(err);
+                                setRunMessage(configId, 'error', `执行失败：${msg}`);
+                              },
+                            }
+                          );
+                        })()
                       }
                       disabled={runAutoScreenMutation.isPending}
                       className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50 disabled:bg-gray-100 sm:w-auto"
@@ -521,8 +565,13 @@ export function AutoScreenConfigsPanel({
                         <RefreshCw className="h-4 w-4" />
                       )}
                       立即执行一次
-                    </button>
+                      </button>
                   </div>
+                  {runMessage && (
+                    <div className={`text-xs ${runMessage.type === 'error' ? 'text-red-600' : 'text-green-700'}`}>
+                      {runMessage.text}
+                    </div>
+                  )}
                 </div>
               );
             })}

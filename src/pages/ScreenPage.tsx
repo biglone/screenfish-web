@@ -85,6 +85,7 @@ export function ScreenPage() {
     arr.sort();
     return arr.join(',');
   }, [selectedFormulas]);
+  const templateComboDisabled = selectedFormulas.size === 1;
 
 
   useEffect(() => {
@@ -172,11 +173,12 @@ export function ScreenPage() {
   const handleCreateFromTemplate = () => {
     if (!isAdmin) return;
     const nextIndex = (autoScreenConfigsQuery.data?.configs?.length ?? 0) + 1;
+    const createCombo = templateComboDisabled ? 'and' : ((formData.combo ?? 'and') as 'and' | 'or');
     createAutoScreenConfigMutation.mutate(
       {
         enabled: true,
         group_name: `自动筛选-${nextIndex}`,
-        combo: (formData.combo ?? 'and') as 'and' | 'or',
+        combo: createCombo,
         rules: selectedRules.trim() ? selectedRules.trim() : null,
         lookback_days: Math.max(0, Math.round(formData.lookback_days ?? 200)),
         with_name: !!formData.with_name,
@@ -357,6 +359,11 @@ export function ScreenPage() {
             已创建配置（{new Date(templateCreatedAt).toLocaleString()}）
           </div>
         )}
+        {createAutoScreenConfigMutation.error && (
+          <div className="mt-2 text-xs text-red-600">
+            创建配置失败：{(createAutoScreenConfigMutation.error as Error).message}
+          </div>
+        )}
 
         <div className="mt-5 grid gap-6 lg:grid-cols-12">
           <div className="lg:col-span-7">
@@ -456,13 +463,17 @@ export function ScreenPage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700">组合方式</label>
                     <select
-                      value={formData.combo}
+                      value={templateComboDisabled ? 'and' : formData.combo}
                       onChange={(e) => setFormData({ ...formData, combo: e.target.value as 'and' | 'or' })}
+                      disabled={templateComboDisabled}
                       className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
                     >
                       <option value="and">AND（全部满足）</option>
                       <option value="or">OR（任一满足）</option>
                     </select>
+                    {templateComboDisabled && (
+                      <div className="mt-1 text-xs text-gray-500">仅 1 条规则，组合方式不生效。</div>
+                    )}
                   </div>
 
                   <div>
