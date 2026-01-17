@@ -442,10 +442,13 @@ export function AutoScreenConfigsPanel({
                         </div>
                         <textarea
                           value={rules}
-                          onChange={(e) => updateAutoScreenDraft(configId, { rules: e.target.value })}
+                          readOnly
                           rows={2}
-                          placeholder="例如：公式A,公式B（留空表示使用全部启用的公式；若无则使用内置规则）"
-                          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                          placeholder="点击“选择规则”进行配置"
+                          onClick={() => openRulePicker(configId, rules)}
+                          onFocus={() => openRulePicker(configId, rules)}
+                          className="mt-1 block w-full cursor-pointer rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-gray-700 shadow-sm focus:border-[color:var(--sf-primary-500)] focus:outline-none focus:ring-1 focus:ring-[color:var(--sf-primary-500)]"
+                          aria-readonly="true"
                         />
                         <div className="mt-1 text-xs text-gray-500">
                           规则会在保存时校验（内置规则如 midline_ma60/kdj_oversold 也可用）。
