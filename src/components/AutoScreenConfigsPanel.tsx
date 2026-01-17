@@ -542,7 +542,7 @@ export function AutoScreenConfigsPanel({
                         (() => {
                           setRunMessage(configId, 'success', '执行中...');
                           runAutoScreenMutation.mutate(
-                            { date: 'latest', force: false, config_id: configId },
+                            { date: 'latest', force: true, config_id: configId },
                             {
                               onSuccess: (data) => {
                                 const msg = data.message || `已执行 ${data.count} 只`;
