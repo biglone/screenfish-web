@@ -149,31 +149,40 @@ function persistPanelVisibleBars(value: Record<KlineTimeframe, number>) {
   }
 }
 
-type FullscreenViewState = Record<KlineTimeframe, { barCount: number; rightOffset: number }>;
+type FullscreenViewState = Record<KlineTimeframe, { barCount: number; rightGap: number }>;
 
 function loadFullscreenViewState(): FullscreenViewState {
   const fallback: FullscreenViewState = {
-    D: { barCount: DEFAULT_VISIBLE_BARS.D, rightOffset: 0 },
-    M: { barCount: DEFAULT_VISIBLE_BARS.M, rightOffset: 0 },
-    Y: { barCount: DEFAULT_VISIBLE_BARS.Y, rightOffset: 0 },
+    D: { barCount: DEFAULT_VISIBLE_BARS.D, rightGap: 0 },
+    M: { barCount: DEFAULT_VISIBLE_BARS.M, rightGap: 0 },
+    Y: { barCount: DEFAULT_VISIBLE_BARS.Y, rightGap: 0 },
   };
   if (typeof window === 'undefined') return fallback;
   try {
     const raw = localStorage.getItem(FULLSCREEN_VIEW_STATE_STORAGE_KEY);
     if (!raw) return fallback;
-    const parsed = JSON.parse(raw) as Partial<FullscreenViewState>;
+    const parsed = JSON.parse(raw) as Partial<
+      Record<KlineTimeframe, { barCount?: number; rightGap?: number; rightOffset?: number }>
+    >;
+    const toRightGap = (gap: unknown, offset: unknown) => {
+      const gapNum = Number(gap);
+      if (Number.isFinite(gapNum)) return Math.round(gapNum);
+      const offsetNum = Number(offset);
+      if (Number.isFinite(offsetNum)) return -Math.max(0, Math.round(offsetNum));
+      return 0;
+    };
     return {
       D: {
         barCount: clampInt(Number(parsed.D?.barCount), 5, MAX_DAILY_BARS, fallback.D.barCount),
-        rightOffset: Math.max(0, Math.round(Number(parsed.D?.rightOffset ?? 0))),
+        rightGap: toRightGap(parsed.D?.rightGap, parsed.D?.rightOffset),
       },
       M: {
         barCount: clampInt(Number(parsed.M?.barCount), 3, MAX_DAILY_BARS, fallback.M.barCount),
-        rightOffset: Math.max(0, Math.round(Number(parsed.M?.rightOffset ?? 0))),
+        rightGap: toRightGap(parsed.M?.rightGap, parsed.M?.rightOffset),
       },
       Y: {
         barCount: clampInt(Number(parsed.Y?.barCount), 2, MAX_DAILY_BARS, fallback.Y.barCount),
-        rightOffset: Math.max(0, Math.round(Number(parsed.Y?.rightOffset ?? 0))),
+        rightGap: toRightGap(parsed.Y?.rightGap, parsed.Y?.rightOffset),
       },
     };
   } catch {
@@ -853,10 +862,14 @@ export function StockDetail({
       const fallback = DEFAULT_VISIBLE_BARS[timeframe];
       if (fullscreen) {
         const view = fullscreenViewStateRef.current[timeframe];
-        const barCount = clampInt(view?.barCount ?? fallback, 2, MAX_DAILY_BARS, fallback);
-        const rightOffset = Math.max(0, Math.round(view?.rightOffset ?? 0));
-        const toIndex = Math.min(to, Math.max(0, to - rightOffset));
-        const fromIndex = Math.max(0, toIndex - barCount);
+        let barCount = clampInt(view?.barCount ?? fallback, 2, MAX_DAILY_BARS, fallback);
+        const rightGap = Number.isFinite(view?.rightGap) ? Math.round(view!.rightGap) : 0;
+        const maxBars = Math.max(2, to);
+        if (barCount > maxBars) barCount = maxBars;
+        let toIndex = to + rightGap;
+        if (!Number.isFinite(toIndex)) toIndex = to;
+        if (toIndex < barCount) toIndex = barCount;
+        const fromIndex = toIndex - barCount;
         if (toIndex > fromIndex) {
           chart.timeScale().setVisibleLogicalRange({ from: fromIndex, to: toIndex });
           appliedInitialViewKeyRef.current = viewKey;
@@ -883,11 +896,11 @@ export function StockDetail({
         if (visibleBars !== null && displayBars.length > 0) {
           const fallback = DEFAULT_VISIBLE_BARS[timeframe];
           const barCount = clampInt(visibleBars, 2, MAX_DAILY_BARS, fallback);
-          const toIndex = Math.round(range.to);
-          const rightOffset = Math.max(0, displayBars.length - toIndex);
+          const toIndex = Number.isFinite(range.to) ? Math.round(range.to) : displayBars.length;
+          const rightGap = toIndex - displayBars.length;
           fullscreenViewStateRef.current = {
             ...fullscreenViewStateRef.current,
-            [timeframe]: { barCount, rightOffset },
+            [timeframe]: { barCount, rightGap },
           };
           const now = Date.now();
           if (now - lastPersistFullscreenViewAtRef.current > 1000) {
