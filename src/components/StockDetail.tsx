@@ -1,7 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ExternalLink, Maximize2, Minimize2, RotateCcw, SkipForward, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  ChevronDown,
+  ChevronUp,
+  ExternalLink,
+  Maximize2,
+  Minimize2,
+  RotateCcw,
+  SkipForward,
+  X,
+} from 'lucide-react';
 import {
   CandlestickSeries,
   HistogramSeries,
@@ -153,6 +163,11 @@ export type StockDetailProps = {
   priceAdjust?: PriceAdjustMode;
   variant?: StockDetailVariant;
   onClose?: () => void;
+  onNavigate?: (direction: 'prev' | 'next') => void;
+  canNavigatePrev?: boolean;
+  canNavigateNext?: boolean;
+  navigationLabel?: string;
+  onFullscreenChange?: (fullscreen: boolean) => void;
 };
 
 function formatDate(yyyymmdd: string) {
@@ -280,7 +295,17 @@ function calcKdj(bars: DailyBar[], n = 9, m1 = 3, m2 = 3) {
   return { k, d, j };
 }
 
-export function StockDetail({ tsCode, priceAdjust = 'qfq', variant = 'page', onClose }: StockDetailProps) {
+export function StockDetail({
+  tsCode,
+  priceAdjust = 'qfq',
+  variant = 'page',
+  onClose,
+  onNavigate,
+  canNavigatePrev = false,
+  canNavigateNext = false,
+  navigationLabel,
+  onFullscreenChange,
+}: StockDetailProps) {
   const tsCodeNormalized = tsCode.trim();
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -324,6 +349,16 @@ export function StockDetail({ tsCode, priceAdjust = 'qfq', variant = 'page', onC
   }, [fullscreen]);
 
   useEffect(() => {
+    if (!onFullscreenChange) return;
+    onFullscreenChange(fullscreen);
+  }, [fullscreen, onFullscreenChange]);
+
+  useEffect(() => {
+    if (!onFullscreenChange) return;
+    return () => onFullscreenChange(false);
+  }, [onFullscreenChange]);
+
+  useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       if (modalData) {
@@ -338,6 +373,28 @@ export function StockDetail({ tsCode, priceAdjust = 'qfq', variant = 'page', onC
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [fullscreen, modalData]);
+
+  useEffect(() => {
+    if (!fullscreen || !onNavigate) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      if (modalData) return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName ?? '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return;
+      if (e.key === 'ArrowUp' && canNavigatePrev) {
+        onNavigate('prev');
+        e.preventDefault();
+      }
+      if (e.key === 'ArrowDown' && canNavigateNext) {
+        onNavigate('next');
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [fullscreen, onNavigate, canNavigatePrev, canNavigateNext, modalData]);
 
   useEffect(() => {
     const apply = () => {
@@ -951,6 +1008,34 @@ export function StockDetail({ tsCode, priceAdjust = 'qfq', variant = 'page', onC
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {fullscreen && onNavigate && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-gray-500">分组</span>
+                <div className="inline-flex overflow-hidden rounded-md border border-gray-300 bg-white shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('prev')}
+                    disabled={!canNavigatePrev}
+                    className="inline-flex h-9 items-center gap-1 px-3 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+                    title="上一只（↑）"
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                    上一只
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('next')}
+                    disabled={!canNavigateNext}
+                    className="inline-flex h-9 items-center gap-1 border-l border-gray-300 px-3 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+                    title="下一只（↓）"
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                    下一只
+                  </button>
+                </div>
+                {navigationLabel && <span className="text-xs text-gray-500">{navigationLabel}</span>}
+              </div>
+            )}
             <span className="text-sm text-gray-500">周期</span>
             <div className="inline-flex overflow-hidden rounded-md border border-gray-300 bg-white shadow-sm">
 	              {(['D', 'M', 'Y'] as const).map((tf, idx) => (

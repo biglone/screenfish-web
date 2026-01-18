@@ -140,6 +140,7 @@ export function WatchlistPage() {
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [activeTsCode, setActiveTsCode] = useState<string | null>(null);
   const [autoSelectDetail, setAutoSelectDetail] = useState(true);
+  const [detailFullscreen, setDetailFullscreen] = useState(false);
   const [watchlistBusy, setWatchlistBusy] = useState(false);
   const [watchlistError, setWatchlistError] = useState<string | null>(null);
   const [watchlistNotice, setWatchlistNotice] = useState<string | null>(null);
@@ -385,9 +386,37 @@ export function WatchlistPage() {
     });
   }, [activeGroup, filter]);
 
+  const activeIndex = useMemo(() => {
+    if (!resolvedActiveTsCode) return -1;
+    return filteredItems.findIndex((i) => i.ts_code === resolvedActiveTsCode);
+  }, [filteredItems, resolvedActiveTsCode]);
+  const canNavigatePrev = activeIndex > 0;
+  const canNavigateNext = activeIndex >= 0 && activeIndex < filteredItems.length - 1;
+  const navigationLabel =
+    activeIndex >= 0 && filteredItems.length > 0 ? `${activeIndex + 1}/${filteredItems.length}` : undefined;
+
+  const handleNavigate = useCallback(
+    (direction: 'prev' | 'next') => {
+      if (!resolvedActiveTsCode || filteredItems.length === 0) return;
+      const tsCodes = filteredItems.map((x) => x.ts_code);
+      const currentIndex = tsCodes.indexOf(resolvedActiveTsCode);
+      const baseIndex = currentIndex === -1 ? 0 : currentIndex;
+      const nextIndex = direction === 'next' ? baseIndex + 1 : baseIndex - 1;
+      if (nextIndex < 0 || nextIndex >= tsCodes.length) return;
+      const nextTsCode = tsCodes[nextIndex];
+      setActiveTsCode(nextTsCode);
+      setAutoSelectDetail(true);
+      document
+        .querySelector<HTMLElement>(`[data-ts-code="${nextTsCode}"]`)
+        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    },
+    [filteredItems, resolvedActiveTsCode, setActiveTsCode, setAutoSelectDetail]
+  );
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.defaultPrevented) return;
+      if (detailFullscreen) return;
       if (e.altKey || e.ctrlKey || e.metaKey) return;
       if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
       if (!resolvedActiveTsCode) return;
@@ -414,7 +443,7 @@ export function WatchlistPage() {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [filteredItems, resolvedActiveTsCode]);
+  }, [detailFullscreen, filteredItems, resolvedActiveTsCode]);
 
   const handleCreateGroup = () => {
     const name = window.prompt('新建分组名称', '新分组');
@@ -924,6 +953,11 @@ export function WatchlistPage() {
                   setActiveTsCode(null);
                   setAutoSelectDetail(false);
                 }}
+                onNavigate={handleNavigate}
+                canNavigatePrev={canNavigatePrev}
+                canNavigateNext={canNavigateNext}
+                navigationLabel={navigationLabel}
+                onFullscreenChange={setDetailFullscreen}
               />
             ) : (
               <div className="flex h-[560px] items-center justify-center text-sm text-gray-500">
