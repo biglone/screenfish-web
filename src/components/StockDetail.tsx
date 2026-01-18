@@ -409,6 +409,7 @@ export function StockDetail({
   const [watchlistActionError, setWatchlistActionError] = useState<string | null>(null);
   const chartHeightRef = useRef<number>(CHART_HEIGHT);
   const fullscreenViewStateRef = useRef<FullscreenViewState>(loadFullscreenViewState());
+  const lastUserViewChangeAtRef = useRef<number>(0);
   const mainAreaRatioRef = useRef<number>(
     1 - ((showVolume ? 1 : 0) + (showKdj ? 1 : 0)) * SUB_PANE_HEIGHT
   );
@@ -426,6 +427,30 @@ export function StockDetail({
     chartHeightRef.current = height;
     setChartHeight(height);
   }, []);
+
+  const markUserViewChange = useCallback(() => {
+    lastUserViewChangeAtRef.current = Date.now();
+  }, []);
+
+  useEffect(() => {
+    const el = chartContainerRef.current;
+    if (!el) return;
+    const handler = () => markUserViewChange();
+    const events: Array<keyof HTMLElementEventMap> = [
+      'wheel',
+      'mousedown',
+      'pointerdown',
+      'touchstart',
+    ];
+    for (const ev of events) {
+      el.addEventListener(ev, handler, { passive: true });
+    }
+    return () => {
+      for (const ev of events) {
+        el.removeEventListener(ev, handler);
+      }
+    };
+  }, [markUserViewChange]);
 
   useEffect(() => {
     if (!fullscreen) return;
@@ -459,6 +484,14 @@ export function StockDetail({
     if (!onFullscreenChange) return;
     return () => onFullscreenChange(false);
   }, [onFullscreenChange]);
+
+  useEffect(() => {
+    return () => {
+      if (fullscreen) {
+        persistFullscreenViewState(fullscreenViewStateRef.current);
+      }
+    };
+  }, [fullscreen]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -899,6 +932,9 @@ export function StockDetail({
     const onVisibleRangeChange = (range: LogicalRange | null) => {
       if (!range) return;
       if (fullscreen) {
+        const now = Date.now();
+        const userDriven = now - lastUserViewChangeAtRef.current < 1500;
+        if (!userDriven) return;
         if (
           Number.isFinite(range.from) &&
           Number.isFinite(range.to) &&
@@ -1390,6 +1426,7 @@ export function StockDetail({
                 if (!chart) return;
                 const to = displayBars.length;
                 if (!to) return;
+                markUserViewChange();
                 const range = chart.timeScale().getVisibleLogicalRange();
                 const currentVisibleBars = visibleBarsFromLogicalRange(range);
                 const fallback = DEFAULT_VISIBLE_BARS[timeframe];
@@ -1410,6 +1447,7 @@ export function StockDetail({
               onClick={() => {
                 const chart = chartRef.current;
                 if (!chart) return;
+                markUserViewChange();
                 chart.timeScale().fitContent();
               }}
               className="inline-flex h-9 items-center gap-1 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700 shadow-sm hover:bg-gray-50"
