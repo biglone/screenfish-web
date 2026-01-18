@@ -168,6 +168,7 @@ export type StockDetailProps = {
   canNavigateNext?: boolean;
   navigationLabel?: string;
   onFullscreenChange?: (fullscreen: boolean) => void;
+  initialFullscreen?: boolean;
 };
 
 function formatDate(yyyymmdd: string) {
@@ -305,6 +306,7 @@ export function StockDetail({
   canNavigateNext = false,
   navigationLabel,
   onFullscreenChange,
+  initialFullscreen = false,
 }: StockDetailProps) {
   const tsCodeNormalized = tsCode.trim();
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -319,7 +321,7 @@ export function StockDetail({
   const [timeframe, setTimeframe] = useState<KlineTimeframe>('D');
   const [showVolume, setShowVolume] = useState(true);
   const [showKdj, setShowKdj] = useState(true);
-  const [fullscreen, setFullscreen] = useState(false);
+  const [fullscreen, setFullscreen] = useState(() => !!initialFullscreen);
   const [chartHeight, setChartHeight] = useState<number>(CHART_HEIGHT);
   const chartHeightRef = useRef<number>(CHART_HEIGHT);
   const mainAreaRatioRef = useRef<number>(

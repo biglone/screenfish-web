@@ -958,6 +958,7 @@ export function WatchlistPage() {
                 canNavigateNext={canNavigateNext}
                 navigationLabel={navigationLabel}
                 onFullscreenChange={setDetailFullscreen}
+                initialFullscreen={detailFullscreen}
               />
             ) : (
               <div className="flex h-[560px] items-center justify-center text-sm text-gray-500">
