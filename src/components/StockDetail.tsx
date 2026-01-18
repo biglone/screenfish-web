@@ -11,6 +11,7 @@ import {
   RotateCcw,
   Star,
   SkipForward,
+  Trash2,
   X,
 } from 'lucide-react';
 import {
@@ -311,8 +312,12 @@ export function StockDetail({
   initialFullscreen = false,
 }: StockDetailProps) {
   const tsCodeNormalized = tsCode.trim();
-  const { groups: watchlistGroups, isLoading: watchlistLoading, upsertItem: upsertWatchlistItem } =
-    useWatchlist();
+  const {
+    groups: watchlistGroups,
+    isLoading: watchlistLoading,
+    upsertItem: upsertWatchlistItem,
+    removeItems: removeWatchlistItems,
+  } = useWatchlist();
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -327,8 +332,8 @@ export function StockDetail({
   const [showKdj, setShowKdj] = useState(true);
   const [fullscreen, setFullscreen] = useState(() => !!initialFullscreen);
   const [chartHeight, setChartHeight] = useState<number>(CHART_HEIGHT);
-  const [addToWatchlistPending, setAddToWatchlistPending] = useState(false);
-  const [addToWatchlistError, setAddToWatchlistError] = useState<string | null>(null);
+  const [watchlistActionPending, setWatchlistActionPending] = useState(false);
+  const [watchlistActionError, setWatchlistActionError] = useState<string | null>(null);
   const chartHeightRef = useRef<number>(CHART_HEIGHT);
   const mainAreaRatioRef = useRef<number>(
     1 - ((showVolume ? 1 : 0) + (showKdj ? 1 : 0)) * SUB_PANE_HEIGHT
@@ -477,37 +482,54 @@ export function StockDetail({
     );
   }, [defaultWatchlistGroup, tsCodeNormalized]);
 
-  const addToWatchlistLabel = watchlistLoading
+  const watchlistActionLabel = watchlistLoading
     ? '自选加载中'
     : !defaultWatchlistGroup
       ? '自选不可用'
-      : addToWatchlistPending
-        ? '加入中...'
+      : watchlistActionPending
+        ? isInDefaultWatchlist
+          ? '移除中...'
+          : '加入中...'
         : isInDefaultWatchlist
-          ? '已在自选'
+          ? '移除自选'
           : '加入自选';
 
-  const addToWatchlistDisabled =
-    watchlistLoading || addToWatchlistPending || isInDefaultWatchlist || !defaultWatchlistGroup;
+  const watchlistActionTitle = isInDefaultWatchlist ? '从默认自选分组移除' : '加入默认自选分组';
 
-  const handleAddToWatchlist = useCallback(async () => {
+  const watchlistActionDisabled =
+    watchlistLoading || watchlistActionPending || !defaultWatchlistGroup;
+
+  const handleToggleWatchlist = useCallback(async () => {
     if (!defaultWatchlistGroup) {
-      setAddToWatchlistError('自选分组不可用');
+      setWatchlistActionError('自选分组不可用');
       return;
     }
-    setAddToWatchlistError(null);
-    setAddToWatchlistPending(true);
+    setWatchlistActionError(null);
+    setWatchlistActionPending(true);
     try {
-      await upsertWatchlistItem(defaultWatchlistGroup.id, {
-        ts_code: tsCodeNormalized,
-        name: watchlistItemName,
-      });
+      if (isInDefaultWatchlist) {
+        await removeWatchlistItems(defaultWatchlistGroup.id, [tsCodeNormalized]);
+      } else {
+        await upsertWatchlistItem(defaultWatchlistGroup.id, {
+          ts_code: tsCodeNormalized,
+          name: watchlistItemName,
+        });
+      }
     } catch (err) {
-      setAddToWatchlistError(err instanceof Error ? err.message : '加入自选失败');
+      setWatchlistActionError(
+        err instanceof Error ? err.message : isInDefaultWatchlist ? '移除自选失败' : '加入自选失败'
+      );
     } finally {
-      setAddToWatchlistPending(false);
+      setWatchlistActionPending(false);
     }
-  }, [defaultWatchlistGroup, tsCodeNormalized, upsertWatchlistItem, watchlistItemName]);
+  }, [
+    defaultWatchlistGroup,
+    isInDefaultWatchlist,
+    removeWatchlistItems,
+    tsCodeNormalized,
+    upsertWatchlistItem,
+    watchlistItemName,
+  ]);
 
   const { data: indicatorFormulasData, isLoading: indicatorsLoading } = useQuery({
     queryKey: ['formulas', 'indicator', 'enabled'],
@@ -1069,17 +1091,25 @@ export function StockDetail({
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={handleAddToWatchlist}
-                  disabled={addToWatchlistDisabled}
-                  className="inline-flex h-9 items-center gap-1 rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-100 disabled:text-gray-400"
-                  title="加入默认自选分组"
+                  onClick={handleToggleWatchlist}
+                  disabled={watchlistActionDisabled}
+                  className={`inline-flex h-9 items-center gap-1 rounded-md border px-3 text-sm transition-colors disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-100 disabled:text-gray-400 ${
+                    isInDefaultWatchlist
+                      ? 'border-red-200 bg-white text-red-600 hover:bg-red-50'
+                      : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                  title={watchlistActionTitle}
                 >
-                  <Star className="h-4 w-4" />
-                  {addToWatchlistLabel}
+                  {isInDefaultWatchlist ? (
+                    <Trash2 className="h-4 w-4" />
+                  ) : (
+                    <Star className="h-4 w-4" />
+                  )}
+                  {watchlistActionLabel}
                 </button>
-                {addToWatchlistError && (
+                {watchlistActionError && (
                   <span className="text-xs text-red-600" role="status" aria-live="polite">
-                    {addToWatchlistError}
+                    {watchlistActionError}
                   </span>
                 )}
               </div>
