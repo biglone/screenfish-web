@@ -116,6 +116,13 @@ function clampInt(value: number, min: number, max: number, fallback: number) {
   return v;
 }
 
+function clampNumber(value: number, min: number, max: number, fallback: number) {
+  if (!Number.isFinite(value)) return fallback;
+  if (value < min) return min;
+  if (value > max) return max;
+  return value;
+}
+
 function visibleBarsFromLogicalRange(range: LogicalRange | null): number | null {
   if (!range) return null;
   if (!Number.isFinite(range.from) || !Number.isFinite(range.to)) return null;
@@ -166,22 +173,22 @@ function loadFullscreenViewState(): FullscreenViewState {
     >;
     const toRightGap = (gap: unknown, offset: unknown) => {
       const gapNum = Number(gap);
-      if (Number.isFinite(gapNum)) return Math.round(gapNum);
+      if (Number.isFinite(gapNum)) return gapNum;
       const offsetNum = Number(offset);
-      if (Number.isFinite(offsetNum)) return -Math.max(0, Math.round(offsetNum));
+      if (Number.isFinite(offsetNum)) return -Math.max(0, offsetNum);
       return 0;
     };
     return {
       D: {
-        barCount: clampInt(Number(parsed.D?.barCount), 5, MAX_DAILY_BARS, fallback.D.barCount),
+        barCount: clampNumber(Number(parsed.D?.barCount), 2, MAX_DAILY_BARS, fallback.D.barCount),
         rightGap: toRightGap(parsed.D?.rightGap, parsed.D?.rightOffset),
       },
       M: {
-        barCount: clampInt(Number(parsed.M?.barCount), 3, MAX_DAILY_BARS, fallback.M.barCount),
+        barCount: clampNumber(Number(parsed.M?.barCount), 2, MAX_DAILY_BARS, fallback.M.barCount),
         rightGap: toRightGap(parsed.M?.rightGap, parsed.M?.rightOffset),
       },
       Y: {
-        barCount: clampInt(Number(parsed.Y?.barCount), 2, MAX_DAILY_BARS, fallback.Y.barCount),
+        barCount: clampNumber(Number(parsed.Y?.barCount), 2, MAX_DAILY_BARS, fallback.Y.barCount),
         rightGap: toRightGap(parsed.Y?.rightGap, parsed.Y?.rightOffset),
       },
     };
@@ -862,8 +869,8 @@ export function StockDetail({
       const fallback = DEFAULT_VISIBLE_BARS[timeframe];
       if (fullscreen) {
         const view = fullscreenViewStateRef.current[timeframe];
-        let barCount = clampInt(view?.barCount ?? fallback, 2, MAX_DAILY_BARS, fallback);
-        const rightGap = Number.isFinite(view?.rightGap) ? Math.round(view!.rightGap) : 0;
+        let barCount = clampNumber(view?.barCount ?? fallback, 2, MAX_DAILY_BARS, fallback);
+        const rightGap = Number.isFinite(view?.rightGap) ? view!.rightGap : 0;
         const maxBars = Math.max(2, to);
         if (barCount > maxBars) barCount = maxBars;
         let toIndex = to + rightGap;
@@ -892,11 +899,14 @@ export function StockDetail({
     const onVisibleRangeChange = (range: LogicalRange | null) => {
       if (!range) return;
       if (fullscreen) {
-        const visibleBars = visibleBarsFromLogicalRange(range);
-        if (visibleBars !== null && displayBars.length > 0) {
+        if (
+          Number.isFinite(range.from) &&
+          Number.isFinite(range.to) &&
+          displayBars.length > 0
+        ) {
           const fallback = DEFAULT_VISIBLE_BARS[timeframe];
-          const barCount = clampInt(visibleBars, 2, MAX_DAILY_BARS, fallback);
-          const toIndex = Number.isFinite(range.to) ? Math.round(range.to) : displayBars.length;
+          const barCount = clampNumber(range.to - range.from, 2, MAX_DAILY_BARS, fallback);
+          const toIndex = Number.isFinite(range.to) ? range.to : displayBars.length;
           const rightGap = toIndex - displayBars.length;
           fullscreenViewStateRef.current = {
             ...fullscreenViewStateRef.current,
