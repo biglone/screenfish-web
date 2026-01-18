@@ -54,6 +54,7 @@ const DEFAULT_VISIBLE_BARS: Record<KlineTimeframe, number> = {
 
 const PANEL_VISIBLE_BARS_STORAGE_KEY = 'screenfish_panel_kline_visible_bars_v1';
 const INDICATOR_SELECTION_STORAGE_KEY = 'screenfish.kline.indicatorSelection';
+const FULLSCREEN_VIEW_STATE_STORAGE_KEY = 'screenfish.kline.fullscreenViewState';
 
 const PRICE_ADJUST_LABEL: Record<PriceAdjustMode, string> = {
   none: '不复权',
@@ -143,6 +144,47 @@ function persistPanelVisibleBars(value: Record<KlineTimeframe, number>) {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(PANEL_VISIBLE_BARS_STORAGE_KEY, JSON.stringify(value));
+  } catch {
+    // ignore
+  }
+}
+
+type FullscreenViewState = Record<KlineTimeframe, { barCount: number; rightOffset: number }>;
+
+function loadFullscreenViewState(): FullscreenViewState {
+  const fallback: FullscreenViewState = {
+    D: { barCount: DEFAULT_VISIBLE_BARS.D, rightOffset: 0 },
+    M: { barCount: DEFAULT_VISIBLE_BARS.M, rightOffset: 0 },
+    Y: { barCount: DEFAULT_VISIBLE_BARS.Y, rightOffset: 0 },
+  };
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const raw = localStorage.getItem(FULLSCREEN_VIEW_STATE_STORAGE_KEY);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw) as Partial<FullscreenViewState>;
+    return {
+      D: {
+        barCount: clampInt(Number(parsed.D?.barCount), 5, MAX_DAILY_BARS, fallback.D.barCount),
+        rightOffset: Math.max(0, Math.round(Number(parsed.D?.rightOffset ?? 0))),
+      },
+      M: {
+        barCount: clampInt(Number(parsed.M?.barCount), 3, MAX_DAILY_BARS, fallback.M.barCount),
+        rightOffset: Math.max(0, Math.round(Number(parsed.M?.rightOffset ?? 0))),
+      },
+      Y: {
+        barCount: clampInt(Number(parsed.Y?.barCount), 2, MAX_DAILY_BARS, fallback.Y.barCount),
+        rightOffset: Math.max(0, Math.round(Number(parsed.Y?.rightOffset ?? 0))),
+      },
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function persistFullscreenViewState(value: FullscreenViewState) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(FULLSCREEN_VIEW_STATE_STORAGE_KEY, JSON.stringify(value));
   } catch {
     // ignore
   }
@@ -350,6 +392,7 @@ export function StockDetail({
   const [watchlistActionPending, setWatchlistActionPending] = useState(false);
   const [watchlistActionError, setWatchlistActionError] = useState<string | null>(null);
   const chartHeightRef = useRef<number>(CHART_HEIGHT);
+  const fullscreenViewStateRef = useRef<FullscreenViewState>(loadFullscreenViewState());
   const mainAreaRatioRef = useRef<number>(
     1 - ((showVolume ? 1 : 0) + (showKdj ? 1 : 0)) * SUB_PANE_HEIGHT
   );
@@ -361,6 +404,7 @@ export function StockDetail({
   const initialPanelVisibleBars = useMemo(() => loadPanelVisibleBars(), []);
   const panelVisibleBarsRef = useRef<Record<KlineTimeframe, number>>(initialPanelVisibleBars);
   const lastPersistPanelVisibleBarsAtRef = useRef<number>(0);
+  const lastPersistFullscreenViewAtRef = useRef<number>(0);
 
   const setChartHeightSafe = useCallback((height: number) => {
     chartHeightRef.current = height;
@@ -807,12 +851,24 @@ export function StockDetail({
     if (displayBars.length > 0) {
       const to = displayBars.length;
       const fallback = DEFAULT_VISIBLE_BARS[timeframe];
+      if (fullscreen) {
+        const view = fullscreenViewStateRef.current[timeframe];
+        const barCount = clampInt(view?.barCount ?? fallback, 2, MAX_DAILY_BARS, fallback);
+        const rightOffset = Math.max(0, Math.round(view?.rightOffset ?? 0));
+        const toIndex = Math.min(to, Math.max(0, to - rightOffset));
+        const fromIndex = Math.max(0, toIndex - barCount);
+        if (toIndex > fromIndex) {
+          chart.timeScale().setVisibleLogicalRange({ from: fromIndex, to: toIndex });
+          appliedInitialViewKeyRef.current = viewKey;
+          return;
+        }
+      }
       const visibleBars = isPanel ? (panelVisibleBarsRef.current[timeframe] ?? fallback) : fallback;
       const from = Math.max(0, to - visibleBars);
       chart.timeScale().setVisibleLogicalRange({ from, to });
       appliedInitialViewKeyRef.current = viewKey;
     }
-  }, [displayBars, isPanel, timeframe, tsCodeNormalized]);
+  }, [displayBars, fullscreen, isPanel, timeframe, tsCodeNormalized]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -822,6 +878,24 @@ export function StockDetail({
 
     const onVisibleRangeChange = (range: LogicalRange | null) => {
       if (!range) return;
+      if (fullscreen) {
+        const visibleBars = visibleBarsFromLogicalRange(range);
+        if (visibleBars !== null && displayBars.length > 0) {
+          const fallback = DEFAULT_VISIBLE_BARS[timeframe];
+          const barCount = clampInt(visibleBars, 2, MAX_DAILY_BARS, fallback);
+          const toIndex = Math.round(range.to);
+          const rightOffset = Math.max(0, displayBars.length - toIndex);
+          fullscreenViewStateRef.current = {
+            ...fullscreenViewStateRef.current,
+            [timeframe]: { barCount, rightOffset },
+          };
+          const now = Date.now();
+          if (now - lastPersistFullscreenViewAtRef.current > 1000) {
+            lastPersistFullscreenViewAtRef.current = now;
+            persistFullscreenViewState(fullscreenViewStateRef.current);
+          }
+        }
+      }
       if (isPanel) {
         const visibleBars = visibleBarsFromLogicalRange(range);
         if (visibleBars !== null) {
@@ -851,7 +925,15 @@ export function StockDetail({
     return () => {
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(onVisibleRangeChange);
     };
-  }, [dailyQuery.fetchNextPage, dailyQuery.hasNextPage, dailyQuery.isFetchingNextPage, isPanel, timeframe]);
+  }, [
+    dailyQuery.fetchNextPage,
+    dailyQuery.hasNextPage,
+    dailyQuery.isFetchingNextPage,
+    displayBars.length,
+    fullscreen,
+    isPanel,
+    timeframe,
+  ]);
 
   useEffect(() => {
     const chart = chartRef.current;
