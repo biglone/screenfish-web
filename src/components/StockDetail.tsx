@@ -53,6 +53,7 @@ const DEFAULT_VISIBLE_BARS: Record<KlineTimeframe, number> = {
 };
 
 const PANEL_VISIBLE_BARS_STORAGE_KEY = 'screenfish_panel_kline_visible_bars_v1';
+const INDICATOR_SELECTION_STORAGE_KEY = 'screenfish.kline.indicatorSelection';
 
 const PRICE_ADJUST_LABEL: Record<PriceAdjustMode, string> = {
   none: '不复权',
@@ -144,6 +145,18 @@ function persistPanelVisibleBars(value: Record<KlineTimeframe, number>) {
     localStorage.setItem(PANEL_VISIBLE_BARS_STORAGE_KEY, JSON.stringify(value));
   } catch {
     // ignore
+  }
+}
+
+function loadIndicatorSelection(): number | 'auto' | 'none' {
+  if (typeof window === 'undefined') return 'auto';
+  try {
+    const raw = String(localStorage.getItem(INDICATOR_SELECTION_STORAGE_KEY) ?? '').trim();
+    if (!raw || raw === 'auto' || raw === 'none') return raw as 'auto' | 'none';
+    const id = Number(raw);
+    return Number.isFinite(id) ? id : 'auto';
+  } catch {
+    return 'auto';
   }
 }
 
@@ -326,7 +339,9 @@ export function StockDetail({
   const kdjLineSeriesRefs = useRef<Array<ISeriesApi<'Line'>>>([]);
   const [hoverData, setHoverData] = useState<HoverData | null>(null);
   const [modalData, setModalData] = useState<ModalData | null>(null);
-  const [indicatorSelection, setIndicatorSelection] = useState<number | 'auto' | 'none'>('auto');
+  const [indicatorSelection, setIndicatorSelection] = useState<number | 'auto' | 'none'>(() =>
+    loadIndicatorSelection()
+  );
   const [timeframe, setTimeframe] = useState<KlineTimeframe>('D');
   const [showVolume, setShowVolume] = useState(true);
   const [showKdj, setShowKdj] = useState(true);
@@ -360,6 +375,19 @@ export function StockDetail({
       document.body.style.overflow = prevOverflow;
     };
   }, [fullscreen]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const value =
+        indicatorSelection === 'auto' || indicatorSelection === 'none'
+          ? indicatorSelection
+          : String(indicatorSelection);
+      localStorage.setItem(INDICATOR_SELECTION_STORAGE_KEY, value);
+    } catch {
+      // ignore
+    }
+  }, [indicatorSelection]);
 
   useEffect(() => {
     if (!onFullscreenChange) return;
@@ -531,13 +559,24 @@ export function StockDetail({
     watchlistItemName,
   ]);
 
-  const { data: indicatorFormulasData, isLoading: indicatorsLoading } = useQuery({
+  const {
+    data: indicatorFormulasData,
+    isLoading: indicatorsLoading,
+    error: indicatorsError,
+  } = useQuery({
     queryKey: ['formulas', 'indicator', 'enabled'],
     queryFn: () => api.listFormulas({ enabledOnly: true, kind: 'indicator' }),
   });
 
   const indicatorFormulas = indicatorFormulasData?.formulas ?? [];
-  const defaultIndicatorId = indicatorFormulas[0]?.id ?? null;
+  const preferredIndicatorId = useMemo(() => {
+    if (indicatorFormulas.length === 0) return null;
+    const keywordMatch = indicatorFormulas.find((f) => String(f.name ?? '').includes('多空线'));
+    if (keywordMatch) return keywordMatch.id;
+    const maMatch = indicatorFormulas.find((f) => /^MA\d+/i.test(String(f.name ?? '').trim()));
+    return maMatch?.id ?? null;
+  }, [indicatorFormulas]);
+  const defaultIndicatorId = preferredIndicatorId ?? indicatorFormulas[0]?.id ?? null;
   const selectedIndicatorId =
     typeof indicatorSelection === 'number'
       ? indicatorFormulas.some((f) => f.id === indicatorSelection)
@@ -1187,6 +1226,11 @@ export function StockDetail({
                 {indicatorSeriesError instanceof Error
                   ? indicatorSeriesError.message
                   : '指标加载失败'}
+              </span>
+            )}
+            {indicatorsError && (
+              <span className="text-sm text-red-600">
+                {indicatorsError instanceof Error ? indicatorsError.message : '指标公式加载失败'}
               </span>
             )}
             {!indicatorsLoading && (indicatorFormulasData?.formulas.length ?? 0) === 0 && (
