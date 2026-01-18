@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Download, Upload, Plus, Pencil, Trash2, Search, X, ArrowLeftRight } from 'lucide-react';
 import api from '../api/client';
@@ -131,8 +131,26 @@ const MIN_LEFT_PANE_WIDTH = 240;
 const MIN_RIGHT_PANE_WIDTH = 520;
 const RESIZER_WIDTH_PX = 12;
 const RESIZER_STEP_PX = 24;
+const PREFETCH_DAILY_PAGE_SIZE = 1200;
+const PREFETCH_DAILY_MAX_BARS = 20000;
+const PREFETCH_CONCURRENCY = 6;
+
+function prevYyyymmdd(yyyymmdd: string): string {
+  if (yyyymmdd.length !== 8) return yyyymmdd;
+  const y = Number(yyyymmdd.slice(0, 4));
+  const m = Number(yyyymmdd.slice(4, 6)) - 1;
+  const d = Number(yyyymmdd.slice(6, 8));
+  const dt = new Date(Date.UTC(y, m, d));
+  if (Number.isNaN(dt.getTime())) return yyyymmdd;
+  dt.setUTCDate(dt.getUTCDate() - 1);
+  const yy = String(dt.getUTCFullYear()).padStart(4, '0');
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getUTCDate()).padStart(2, '0');
+  return `${yy}${mm}${dd}`;
+}
 
 export function WatchlistPage() {
+  const queryClient = useQueryClient();
   const { groups, createGroup, renameGroup, deleteGroup, refresh, upsertItem, removeItems } =
     useWatchlist();
   const [priceAdjust] = usePriceAdjust();
@@ -342,6 +360,75 @@ export function WatchlistPage() {
     const common = Array.from(mapA.keys()).filter((x) => mapB.has(x)).sort();
     return { onlyA, onlyB, common, mapA, mapB };
   }, [compareGroupA, compareGroupB]);
+
+  const watchlistTsCodes = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const group of groups) {
+      for (const item of group.items) {
+        const raw = item.ts_code.trim();
+        if (!raw) continue;
+        const key = raw.toUpperCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(raw);
+      }
+    }
+    return out;
+  }, [groups]);
+
+  useEffect(() => {
+    if (watchlistTsCodes.length === 0) return;
+    let cancelled = false;
+    const queue = [...watchlistTsCodes];
+
+    const prefetchOne = async (tsCode: string) => {
+      const key = ['stock-daily', tsCode, priceAdjust] as const;
+      if (queryClient.getQueryData(key)) return;
+      await queryClient.prefetchInfiniteQuery({
+        queryKey: key,
+        queryFn: ({ pageParam }: { pageParam: string | undefined }) =>
+          api.getStockDaily(tsCode, {
+            end: pageParam,
+            limit: PREFETCH_DAILY_PAGE_SIZE,
+            price_adjust: priceAdjust,
+          }),
+        initialPageParam: undefined,
+        getNextPageParam: (lastPage, allPages) => {
+          const total = allPages.reduce((acc, p) => acc + p.bars.length, 0);
+          if (total >= PREFETCH_DAILY_MAX_BARS) return undefined;
+          if (lastPage.bars.length < PREFETCH_DAILY_PAGE_SIZE) return undefined;
+          let earliest: string | undefined;
+          for (const page of allPages) {
+            const first = page.bars[0]?.trade_date;
+            if (!first) continue;
+            if (!earliest || first < earliest) earliest = first;
+          }
+          return earliest ? prevYyyymmdd(earliest) : undefined;
+        },
+      });
+    };
+
+    const worker = async () => {
+      while (!cancelled) {
+        const tsCode = queue.shift();
+        if (!tsCode) return;
+        if (cancelled) return;
+        try {
+          await prefetchOne(tsCode);
+        } catch {
+          // ignore prefetch failures
+        }
+      }
+    };
+
+    const workers = Array.from({ length: PREFETCH_CONCURRENCY }, () => worker());
+    void Promise.all(workers);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [priceAdjust, queryClient, watchlistTsCodes]);
 
   useEffect(() => {
     if (!compareOpen) return;
