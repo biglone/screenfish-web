@@ -384,6 +384,7 @@ export function StockDetail({
           ? indicatorSelection
           : String(indicatorSelection);
       localStorage.setItem(INDICATOR_SELECTION_STORAGE_KEY, value);
+      window.dispatchEvent(new Event('screenfish_indicator_selection_changed'));
     } catch {
       // ignore
     }

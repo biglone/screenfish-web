@@ -132,7 +132,22 @@ const MIN_RIGHT_PANE_WIDTH = 520;
 const RESIZER_WIDTH_PX = 12;
 const RESIZER_STEP_PX = 24;
 const PREFETCH_DAILY_PAGE_SIZE = 1200;
+const PREFETCH_INDICATOR_LIMIT = PREFETCH_DAILY_PAGE_SIZE;
 const PREFETCH_CONCURRENCY = 6;
+const PREFETCH_INDICATOR_CONCURRENCY = 4;
+const INDICATOR_SELECTION_STORAGE_KEY = 'screenfish.kline.indicatorSelection';
+
+function loadIndicatorSelection(): number | 'auto' | 'none' {
+  if (typeof window === 'undefined') return 'auto';
+  try {
+    const raw = String(localStorage.getItem(INDICATOR_SELECTION_STORAGE_KEY) ?? '').trim();
+    if (!raw || raw === 'auto' || raw === 'none') return raw as 'auto' | 'none';
+    const id = Number(raw);
+    return Number.isFinite(id) ? id : 'auto';
+  } catch {
+    return 'auto';
+  }
+}
 
 export function WatchlistPage() {
   const queryClient = useQueryClient();
@@ -149,6 +164,9 @@ export function WatchlistPage() {
   const [watchlistNotice, setWatchlistNotice] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
   const [addCode, setAddCode] = useState('');
+  const [indicatorSelection, setIndicatorSelection] = useState<number | 'auto' | 'none'>(() =>
+    loadIndicatorSelection()
+  );
 
   const [compareOpen, setCompareOpen] = useState(false);
   const [compareGroupAId, setCompareGroupAId] = useState<string>('');
@@ -211,6 +229,13 @@ export function WatchlistPage() {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, [clampLeftPaneWidth, splitEnabled]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handler = () => setIndicatorSelection(loadIndicatorSelection());
+    window.addEventListener('screenfish_indicator_selection_changed', handler);
+    return () => window.removeEventListener('screenfish_indicator_selection_changed', handler);
+  }, []);
 
   const endResizeDrag = useCallback(() => {
     if (!resizeDragRef.current) return;
@@ -306,6 +331,30 @@ export function WatchlistPage() {
     retry: 1,
   });
   const stockSearchResults = stockSearchQuery.data?.stocks ?? [];
+
+  const indicatorFormulasQuery = useQuery({
+    queryKey: ['formulas', 'indicator', 'enabled'],
+    queryFn: () => api.listFormulas({ enabledOnly: true, kind: 'indicator' }),
+    staleTime: 60_000,
+    retry: 1,
+  });
+  const indicatorFormulas = indicatorFormulasQuery.data?.formulas ?? [];
+  const preferredIndicatorId = useMemo(() => {
+    if (indicatorFormulas.length === 0) return null;
+    const keywordMatch = indicatorFormulas.find((f) => String(f.name ?? '').includes('多空线'));
+    if (keywordMatch) return keywordMatch.id;
+    const maMatch = indicatorFormulas.find((f) => /^MA\d+/i.test(String(f.name ?? '').trim()));
+    return maMatch?.id ?? null;
+  }, [indicatorFormulas]);
+  const defaultIndicatorId = preferredIndicatorId ?? indicatorFormulas[0]?.id ?? null;
+  const resolvedIndicatorId = useMemo(() => {
+    if (indicatorSelection === 'none') return null;
+    if (typeof indicatorSelection === 'number') {
+      const exists = indicatorFormulas.some((f) => f.id === indicatorSelection);
+      return exists ? indicatorSelection : defaultIndicatorId;
+    }
+    return defaultIndicatorId;
+  }, [defaultIndicatorId, indicatorFormulas, indicatorSelection]);
 
   const activeGroup = useMemo(() => {
     if (groups.length === 0) return null;
@@ -403,6 +452,52 @@ export function WatchlistPage() {
       cancelled = true;
     };
   }, [priceAdjust, queryClient, watchlistTsCodes]);
+
+  useEffect(() => {
+    if (!resolvedIndicatorId) return;
+    if (watchlistTsCodes.length === 0) return;
+    let cancelled = false;
+    const queue = [...watchlistTsCodes];
+
+    const prefetchOne = async (tsCode: string) => {
+      const key = [
+        'indicator-series',
+        tsCode,
+        resolvedIndicatorId,
+        PREFETCH_INDICATOR_LIMIT,
+        priceAdjust,
+      ] as const;
+      if (queryClient.getQueryData(key)) return;
+      await queryClient.prefetchQuery({
+        queryKey: key,
+        queryFn: () =>
+          api.getIndicatorSeries(tsCode, resolvedIndicatorId, {
+            limit: PREFETCH_INDICATOR_LIMIT,
+            price_adjust: priceAdjust,
+          }),
+      });
+    };
+
+    const worker = async () => {
+      while (!cancelled) {
+        const tsCode = queue.shift();
+        if (!tsCode) return;
+        if (cancelled) return;
+        try {
+          await prefetchOne(tsCode);
+        } catch {
+          // ignore prefetch failures
+        }
+      }
+    };
+
+    const workers = Array.from({ length: PREFETCH_INDICATOR_CONCURRENCY }, () => worker());
+    void Promise.all(workers);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [priceAdjust, queryClient, resolvedIndicatorId, watchlistTsCodes]);
 
   useEffect(() => {
     if (!compareOpen) return;
