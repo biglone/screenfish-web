@@ -132,22 +132,7 @@ const MIN_RIGHT_PANE_WIDTH = 520;
 const RESIZER_WIDTH_PX = 12;
 const RESIZER_STEP_PX = 24;
 const PREFETCH_DAILY_PAGE_SIZE = 1200;
-const PREFETCH_DAILY_MAX_BARS = 20000;
 const PREFETCH_CONCURRENCY = 6;
-
-function prevYyyymmdd(yyyymmdd: string): string {
-  if (yyyymmdd.length !== 8) return yyyymmdd;
-  const y = Number(yyyymmdd.slice(0, 4));
-  const m = Number(yyyymmdd.slice(4, 6)) - 1;
-  const d = Number(yyyymmdd.slice(6, 8));
-  const dt = new Date(Date.UTC(y, m, d));
-  if (Number.isNaN(dt.getTime())) return yyyymmdd;
-  dt.setUTCDate(dt.getUTCDate() - 1);
-  const yy = String(dt.getUTCFullYear()).padStart(4, '0');
-  const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(dt.getUTCDate()).padStart(2, '0');
-  return `${yy}${mm}${dd}`;
-}
 
 export function WatchlistPage() {
   const queryClient = useQueryClient();
@@ -394,18 +379,7 @@ export function WatchlistPage() {
             price_adjust: priceAdjust,
           }),
         initialPageParam: undefined,
-        getNextPageParam: (lastPage, allPages) => {
-          const total = allPages.reduce((acc, p) => acc + p.bars.length, 0);
-          if (total >= PREFETCH_DAILY_MAX_BARS) return undefined;
-          if (lastPage.bars.length < PREFETCH_DAILY_PAGE_SIZE) return undefined;
-          let earliest: string | undefined;
-          for (const page of allPages) {
-            const first = page.bars[0]?.trade_date;
-            if (!first) continue;
-            if (!earliest || first < earliest) earliest = first;
-          }
-          return earliest ? prevYyyymmdd(earliest) : undefined;
-        },
+        getNextPageParam: () => undefined,
       });
     };
 
