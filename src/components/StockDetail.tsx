@@ -9,6 +9,7 @@ import {
   Maximize2,
   Minimize2,
   RotateCcw,
+  Star,
   SkipForward,
   X,
 } from 'lucide-react';
@@ -27,6 +28,7 @@ import {
   type WhitespaceData,
 } from 'lightweight-charts';
 import api from '../api/client';
+import { useWatchlist } from '../hooks/useWatchlist';
 import type { DailyBar, IndicatorLine, IndicatorPoint } from '../types/api';
 import type { PriceAdjustMode } from '../hooks/usePriceAdjust';
 
@@ -309,6 +311,8 @@ export function StockDetail({
   initialFullscreen = false,
 }: StockDetailProps) {
   const tsCodeNormalized = tsCode.trim();
+  const { groups: watchlistGroups, isLoading: watchlistLoading, upsertItem: upsertWatchlistItem } =
+    useWatchlist();
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -323,6 +327,8 @@ export function StockDetail({
   const [showKdj, setShowKdj] = useState(true);
   const [fullscreen, setFullscreen] = useState(() => !!initialFullscreen);
   const [chartHeight, setChartHeight] = useState<number>(CHART_HEIGHT);
+  const [addToWatchlistPending, setAddToWatchlistPending] = useState(false);
+  const [addToWatchlistError, setAddToWatchlistError] = useState<string | null>(null);
   const chartHeightRef = useRef<number>(CHART_HEIGHT);
   const mainAreaRatioRef = useRef<number>(
     1 - ((showVolume ? 1 : 0) + (showKdj ? 1 : 0)) * SUB_PANE_HEIGHT
@@ -455,6 +461,53 @@ export function StockDetail({
   const data = dailyData;
   const isLoading = dailyQuery.isLoading;
   const error = dailyQuery.error;
+  const stockLabel = data?.name ? `${data.name} (${tsCodeNormalized})` : tsCodeNormalized;
+  const watchlistItemName = data?.name ?? null;
+
+  const defaultWatchlistGroup = useMemo(() => {
+    if (watchlistGroups.length === 0) return null;
+    return watchlistGroups.find((group) => group.id === 'default') ?? watchlistGroups[0] ?? null;
+  }, [watchlistGroups]);
+
+  const isInDefaultWatchlist = useMemo(() => {
+    if (!defaultWatchlistGroup) return false;
+    const target = tsCodeNormalized.toUpperCase();
+    return defaultWatchlistGroup.items.some(
+      (item) => item.ts_code.trim().toUpperCase() === target
+    );
+  }, [defaultWatchlistGroup, tsCodeNormalized]);
+
+  const addToWatchlistLabel = watchlistLoading
+    ? '自选加载中'
+    : !defaultWatchlistGroup
+      ? '自选不可用'
+      : addToWatchlistPending
+        ? '加入中...'
+        : isInDefaultWatchlist
+          ? '已在自选'
+          : '加入自选';
+
+  const addToWatchlistDisabled =
+    watchlistLoading || addToWatchlistPending || isInDefaultWatchlist || !defaultWatchlistGroup;
+
+  const handleAddToWatchlist = useCallback(async () => {
+    if (!defaultWatchlistGroup) {
+      setAddToWatchlistError('自选分组不可用');
+      return;
+    }
+    setAddToWatchlistError(null);
+    setAddToWatchlistPending(true);
+    try {
+      await upsertWatchlistItem(defaultWatchlistGroup.id, {
+        ts_code: tsCodeNormalized,
+        name: watchlistItemName,
+      });
+    } catch (err) {
+      setAddToWatchlistError(err instanceof Error ? err.message : '加入自选失败');
+    } finally {
+      setAddToWatchlistPending(false);
+    }
+  }, [defaultWatchlistGroup, tsCodeNormalized, upsertWatchlistItem, watchlistItemName]);
 
   const { data: indicatorFormulasData, isLoading: indicatorsLoading } = useQuery({
     queryKey: ['formulas', 'indicator', 'enabled'],
@@ -1004,12 +1057,33 @@ export function StockDetail({
       >
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-lg font-semibold text-gray-900">K线图</h2>
+            <h2 className="min-w-0 truncate text-lg font-semibold text-gray-900">
+              {fullscreen ? stockLabel : 'K线图'}
+            </h2>
             <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
               {priceAdjustLabel}
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {fullscreen && (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleAddToWatchlist}
+                  disabled={addToWatchlistDisabled}
+                  className="inline-flex h-9 items-center gap-1 rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-100 disabled:text-gray-400"
+                  title="加入默认自选分组"
+                >
+                  <Star className="h-4 w-4" />
+                  {addToWatchlistLabel}
+                </button>
+                {addToWatchlistError && (
+                  <span className="text-xs text-red-600" role="status" aria-live="polite">
+                    {addToWatchlistError}
+                  </span>
+                )}
+              </div>
+            )}
             {fullscreen && onNavigate && (
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm text-gray-500">分组</span>
