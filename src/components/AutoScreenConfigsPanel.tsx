@@ -63,6 +63,7 @@ export function AutoScreenConfigsPanel({
   const [runMessages, setRunMessages] = useState<
     Record<string, { type: 'success' | 'error'; text: string; at: number }>
   >({});
+  const [runPending, setRunPending] = useState<Record<string, boolean>>({});
 
   const autoScreenConfigs = autoScreenConfigsQuery.data?.configs ?? [];
   const formulas = formulasQuery.data?.formulas ?? [];
@@ -153,6 +154,17 @@ export function AutoScreenConfigsPanel({
       ...prev,
       [configId]: { type, text, at: Date.now() },
     }));
+  };
+  const setRunPendingState = (configId: string, pending: boolean) => {
+    setRunPending((prev) => {
+      const next = { ...prev };
+      if (pending) {
+        next[configId] = true;
+      } else {
+        delete next[configId];
+      }
+      return next;
+    });
   };
 
   const clearAutoScreenDraft = (configId: string) => {
@@ -328,6 +340,7 @@ export function AutoScreenConfigsPanel({
               const canSave = groupName.trim().length > 0 && !updateAutoScreenConfigItemMutation.isPending;
               const savedAt = autoScreenSavedAt[configId];
               const runMessage = runMessages[configId];
+              const isRunPending = !!runPending[configId];
               const lastTradeDate = formatTradeDate(config.last_trade_date);
               const lastCount = config.last_count ?? 0;
 
@@ -541,6 +554,7 @@ export function AutoScreenConfigsPanel({
                       onClick={() =>
                         (() => {
                           setRunMessage(configId, 'success', '执行中...');
+                          setRunPendingState(configId, true);
                           runAutoScreenMutation.mutate(
                             { date: 'latest', force: true, config_id: configId },
                             {
@@ -552,14 +566,17 @@ export function AutoScreenConfigsPanel({
                                 const msg = err instanceof Error ? err.message : String(err);
                                 setRunMessage(configId, 'error', `执行失败：${msg}`);
                               },
+                              onSettled: () => {
+                                setRunPendingState(configId, false);
+                              },
                             }
                           );
                         })()
                       }
-                      disabled={runAutoScreenMutation.isPending}
+                      disabled={isRunPending}
                       className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50 disabled:bg-gray-100 sm:w-auto"
                     >
-                      {runAutoScreenMutation.isPending ? (
+                      {isRunPending ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <RefreshCw className="h-4 w-4" />
