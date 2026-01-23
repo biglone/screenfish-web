@@ -390,6 +390,9 @@ export function StockDetail({
     removeItems: removeWatchlistItems,
   } = useWatchlist();
   const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chartShellRef = useRef<HTMLDivElement>(null);
+  const chartHeaderRef = useRef<HTMLDivElement>(null);
+  const chartMetaRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const indicatorLineSeriesRefs = useRef<Array<ISeriesApi<'Line'>>>([]);
@@ -422,11 +425,27 @@ export function StockDetail({
   const panelVisibleBarsRef = useRef<Record<KlineTimeframe, number>>(initialPanelVisibleBars);
   const lastPersistPanelVisibleBarsAtRef = useRef<number>(0);
   const lastPersistFullscreenViewAtRef = useRef<number>(0);
+  const toolbarClass = fullscreen
+    ? 'flex items-center gap-2 overflow-x-auto pb-1 -mx-2 px-2 sm:mx-0 sm:px-0 sm:flex-wrap sm:overflow-visible'
+    : 'flex flex-wrap items-center gap-2';
 
   const setChartHeightSafe = useCallback((height: number) => {
     chartHeightRef.current = height;
     setChartHeight(height);
   }, []);
+
+  const syncFullscreenChartHeight = useCallback(() => {
+    if (!fullscreen) return;
+    const shell = chartShellRef.current;
+    const chartEl = chartContainerRef.current;
+    if (!shell || !chartEl) return;
+    const shellRect = shell.getBoundingClientRect();
+    const chartRect = chartEl.getBoundingClientRect();
+    const available = Math.max(240, Math.floor(shellRect.bottom - chartRect.top));
+    if (Math.abs(available - chartHeightRef.current) >= 2) {
+      setChartHeightSafe(available);
+    }
+  }, [fullscreen, setChartHeightSafe]);
 
   const markUserViewChange = useCallback(() => {
     lastUserViewChangeAtRef.current = Date.now();
@@ -532,20 +551,35 @@ export function StockDetail({
   }, [fullscreen, onNavigate, canNavigatePrev, canNavigateNext, modalData]);
 
   useEffect(() => {
-    const apply = () => {
-      if (!fullscreen) {
-        setChartHeightSafe(CHART_HEIGHT);
-        return;
-      }
-      const next = Math.max(CHART_HEIGHT, Math.floor(window.innerHeight - 220));
-      setChartHeightSafe(next);
+    if (!fullscreen) {
+      setChartHeightSafe(CHART_HEIGHT);
+      return;
+    }
+    const raf = window.requestAnimationFrame(syncFullscreenChartHeight);
+    const onResize = () => window.requestAnimationFrame(syncFullscreenChartHeight);
+    window.addEventListener('resize', onResize);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.removeEventListener('resize', onResize);
     };
+  }, [fullscreen, setChartHeightSafe, syncFullscreenChartHeight]);
 
-    apply();
-    if (!fullscreen) return;
-    window.addEventListener('resize', apply);
-    return () => window.removeEventListener('resize', apply);
-  }, [fullscreen, setChartHeightSafe]);
+  useEffect(() => {
+    if (!fullscreen || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      window.requestAnimationFrame(syncFullscreenChartHeight);
+    });
+    if (chartShellRef.current) {
+      ro.observe(chartShellRef.current);
+    }
+    if (chartHeaderRef.current) {
+      ro.observe(chartHeaderRef.current);
+    }
+    if (chartMetaRef.current) {
+      ro.observe(chartMetaRef.current);
+    }
+    return () => ro.disconnect();
+  }, [fullscreen, syncFullscreenChartHeight]);
 
   const dailyQuery = useInfiniteQuery({
     queryKey: ['stock-daily', tsCodeNormalized, priceAdjust],
@@ -1252,13 +1286,17 @@ export function StockDetail({
         />
       )}
       <div
+        ref={chartShellRef}
         className={
           fullscreen
-            ? 'fixed inset-2 z-50 flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white p-4 shadow-xl sm:inset-4'
+            ? 'fixed inset-0 z-50 flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-white p-3 sm:inset-4 sm:h-auto sm:rounded-lg sm:border sm:border-gray-200 sm:p-4 sm:shadow-xl'
             : 'overflow-hidden rounded-lg border border-gray-200 bg-white p-4'
         }
       >
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div
+          ref={chartHeaderRef}
+          className="mb-3 flex flex-col gap-3 sm:mb-4 sm:flex-row sm:items-center sm:justify-between"
+        >
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="min-w-0 truncate text-lg font-semibold text-gray-900">
               {fullscreen ? stockLabel : 'K线图'}
@@ -1267,7 +1305,7 @@ export function StockDetail({
               {priceAdjustLabel}
             </span>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className={toolbarClass}>
             {fullscreen && (
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -1469,7 +1507,10 @@ export function StockDetail({
         </div>
 
         {displayBars.length > 0 && (
-          <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-700">
+          <div
+            ref={chartMetaRef}
+            className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-700"
+          >
             {(() => {
               const bar = hoverData?.bar ?? displayBars[displayBars.length - 1];
               const prev =
@@ -1499,7 +1540,7 @@ export function StockDetail({
 
         <div
           ref={chartContainerRef}
-          className={fullscreen ? 'relative w-full flex-1' : 'relative w-full'}
+          className={fullscreen ? 'relative w-full flex-1 min-h-0' : 'relative w-full'}
           style={{ height: chartHeight }}
         >
 	          {dailyQuery.isFetching && displayBars.length === 0 && (
